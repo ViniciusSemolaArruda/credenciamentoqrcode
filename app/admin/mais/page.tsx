@@ -11,6 +11,8 @@ import {
   Settings2,
 } from "lucide-react";
 
+import LogoutButton from "./LogoutButton";
+
 // ==========================================
 // OPÇÕES DO MENU ADMINISTRATIVO
 // ==========================================
@@ -49,16 +51,11 @@ const opcoes = [
 export default function MaisPage() {
   return (
     <main className="relative min-h-dvh bg-[#080F15] text-white">
-
       {/* EFEITO DE FUNDO */}
       <div className="pointer-events-none absolute inset-x-0 top-0 h-80 bg-[radial-gradient(ellipse_at_top,rgba(33,54,61,0.35),transparent_70%)]" />
 
       <div className="relative mx-auto w-full max-w-lg px-4 pb-8 pt-5">
-
-        {/* ======================================
-            HEADER — PADRÃO ADMINISTRATIVO
-        ====================================== */}
-
+        {/* HEADER */}
         <header className="mb-6 flex items-center gap-3">
           <div className="relative h-11 w-11 shrink-0">
             <Image
@@ -82,10 +79,7 @@ export default function MaisPage() {
           </div>
         </header>
 
-        {/* ======================================
-            TÍTULO DA SEÇÃO
-        ====================================== */}
-
+        {/* TÍTULO DA SEÇÃO */}
         <div className="mb-4 flex items-center gap-2">
           <Settings2
             size={19}
@@ -97,10 +91,7 @@ export default function MaisPage() {
           </h2>
         </div>
 
-        {/* ======================================
-            LISTA DE OPÇÕES
-        ====================================== */}
-
+        {/* LISTA DE OPÇÕES */}
         <section className="space-y-3">
           {opcoes.map((opcao) => {
             const Icone = opcao.icone;
@@ -111,7 +102,6 @@ export default function MaisPage() {
                 href={opcao.href}
                 className="group flex min-h-[82px] items-center gap-3 rounded-2xl border border-white/[0.08] bg-[#141D25] p-4 transition hover:border-[#F4C75D]/35 hover:bg-[#18232C]"
               >
-                {/* ÍCONE */}
                 <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-[#F4C75D]/15 bg-[#F4C75D]/10">
                   <Icone
                     size={21}
@@ -119,7 +109,6 @@ export default function MaisPage() {
                   />
                 </div>
 
-                {/* INFORMAÇÕES */}
                 <div className="min-w-0 flex-1">
                   <h3 className="text-sm font-bold text-white">
                     {opcao.titulo}
@@ -130,7 +119,6 @@ export default function MaisPage() {
                   </p>
                 </div>
 
-                {/* SETA */}
                 <ChevronRight
                   size={18}
                   className="shrink-0 text-white/30 transition group-hover:translate-x-0.5 group-hover:text-[#F4C75D]"
@@ -140,10 +128,16 @@ export default function MaisPage() {
           })}
         </section>
 
-        {/* ======================================
-            RODAPÉ
-        ====================================== */}
+        {/* SAIR DA CONTA */}
+        <section className="mt-7">
+          <h2 className="mb-3 text-xs font-semibold uppercase tracking-[0.12em] text-white/40">
+            Sessão
+          </h2>
 
+          <LogoutButton />
+        </section>
+
+        {/* RODAPÉ */}
         <div className="mt-8 border-t border-white/[0.08] pt-5 text-center">
           <p className="text-[11px] font-medium text-white/45">
             Sistema de Credenciamento

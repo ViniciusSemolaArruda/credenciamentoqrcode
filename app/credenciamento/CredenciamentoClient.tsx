@@ -32,6 +32,16 @@ import {
   XCircle,
 } from "lucide-react";
 
+// ==========================================
+// TIPOS
+// ==========================================
+
+type UltimaEntrada = {
+  nome: string;
+  sobrenome: string;
+  horario: string;
+};
+
 type Ingresso = {
   id: string;
   codigo: string;
@@ -39,6 +49,7 @@ type Ingresso = {
   escola: {
     nome: string;
   };
+  ultimaEntrada?: UltimaEntrada | null;
 };
 
 type Tela =
@@ -49,6 +60,10 @@ type Tela =
   | "liberacao"
   | "sucesso";
 
+// ==========================================
+// ESTILOS
+// ==========================================
+
 const BOTAO_DOURADO =
   "flex min-h-[52px] w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-b from-[#FFE18A] via-[#F2C65C] to-[#DDA73F] px-4 py-3 text-sm font-bold text-[#261A08] shadow-[0_6px_22px_rgba(225,174,65,0.17)] transition hover:brightness-110 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50";
 
@@ -57,6 +72,10 @@ const BOTAO_SECUNDARIO =
 
 const CAMPO =
   "h-[51px] w-full rounded-xl border border-white/15 bg-[#151E26] px-4 text-base text-white outline-none transition placeholder:text-white/35 focus:border-[#E7BE69] focus:ring-2 focus:ring-[#E7BE69]/15";
+
+// ==========================================
+// CARTÃO DO INGRESSO
+// ==========================================
 
 function CartaoIngresso({
   ingresso,
@@ -87,6 +106,7 @@ function CartaoIngresso({
         <p className="truncate text-sm font-semibold text-white">
           {ingresso.escola.nome}
         </p>
+
         <p className="mt-1 text-xs text-white/50">
           {ingresso.codigo}
         </p>
@@ -94,6 +114,59 @@ function CartaoIngresso({
     </div>
   );
 }
+
+// ==========================================
+// CARTÃO DA ÚLTIMA ENTRADA
+// ==========================================
+
+function CartaoUltimaEntrada({
+  entrada,
+}: {
+  entrada: UltimaEntrada;
+}) {
+  const data = new Date(entrada.horario);
+
+  const horarioFormatado = Number.isNaN(data.getTime())
+    ? "Horário não disponível"
+    : new Intl.DateTimeFormat("pt-BR", {
+        timeZone: "America/Sao_Paulo",
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      }).format(data);
+
+  return (
+    <div className="mt-4 rounded-2xl border border-red-400/20 bg-[#2B1519]/80 p-5 text-left">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-red-300/75">
+        Participante que utilizou o ingresso
+      </p>
+
+      <p className="mt-3 break-words text-xl font-bold text-white">
+        {entrada.nome} {entrada.sobrenome}
+      </p>
+
+      <div className="mt-4 border-t border-white/10 pt-3">
+        <p className="text-xs text-white/45">
+          Data e horário da entrada
+        </p>
+
+        <p className="mt-1 text-sm font-semibold text-white/80">
+          {horarioFormatado}
+        </p>
+
+        <p className="mt-1 text-[11px] text-white/40">
+          Horário de Brasília
+        </p>
+      </div>
+    </div>
+  );
+}
+
+// ==========================================
+// MOLDURA DO SCANNER
+// ==========================================
 
 function MolduraScanner({
   ativa = false,
@@ -117,6 +190,10 @@ function MolduraScanner({
   );
 }
 
+// ==========================================
+// COMPONENTE PRINCIPAL
+// ==========================================
+
 export default function CredenciamentoPage() {
   const router = useRouter();
 
@@ -128,18 +205,23 @@ export default function CredenciamentoPage() {
 
   const [funcionario, setFuncionario] = useState("");
   const [tela, setTela] = useState<Tela>("scanner");
+
   const [cameraAtiva, setCameraAtiva] = useState(false);
   const [iniciandoCamera, setIniciandoCamera] =
     useState(false);
+
   const [carregando, setCarregando] = useState(false);
   const [saindo, setSaindo] = useState(false);
+
   const [lanternaAtiva, setLanternaAtiva] =
     useState(false);
+
   const [lanternaDisponivel, setLanternaDisponivel] =
     useState(false);
 
   const [ingresso, setIngresso] =
     useState<Ingresso | null>(null);
+
   const [qrToken, setQrToken] = useState("");
 
   const [nome, setNome] = useState("");
@@ -154,6 +236,7 @@ export default function CredenciamentoPage() {
 
   const [tentativasRestantes, setTentativasRestantes] =
     useState<number | null>(null);
+
   const [bloqueadoAte, setBloqueadoAte] =
     useState<string | null>(null);
 
@@ -219,13 +302,17 @@ export default function CredenciamentoPage() {
   function limparDados() {
     setIngresso(null);
     setQrToken("");
+
     setNome("");
     setSobrenome("");
+
     setMotivo("");
     setPinGerente("");
     setMostrarPin(false);
+
     setErro("");
     setMensagem("");
+
     setTentativasRestantes(null);
     setBloqueadoAte(null);
   }
@@ -236,8 +323,11 @@ export default function CredenciamentoPage() {
 
   async function novoCredenciamento() {
     await pararCamera();
+
     limparDados();
+
     processandoRef.current = false;
+
     setTela("scanner");
   }
 
@@ -256,6 +346,7 @@ export default function CredenciamentoPage() {
       }
 
       processandoRef.current = true;
+
       setCarregando(true);
       setErro("");
       setMensagem("");
@@ -271,6 +362,7 @@ export default function CredenciamentoPage() {
               "Content-Type": "application/json",
             },
             credentials: "same-origin",
+            cache: "no-store",
             body: JSON.stringify({
               qrToken: token,
             }),
@@ -314,6 +406,7 @@ export default function CredenciamentoPage() {
         if (montadoRef.current) {
           setCarregando(false);
         }
+
         processandoRef.current = false;
       }
     },
@@ -397,7 +490,8 @@ export default function CredenciamentoPage() {
         setCameraAtiva(true);
 
         try {
-          const recursos = scanner.getRunningTrackCapabilities();
+          const recursos =
+            scanner.getRunningTrackCapabilities();
 
           setLanternaDisponivel(
             Boolean(
@@ -414,6 +508,7 @@ export default function CredenciamentoPage() {
       setErro(
         "Não foi possível abrir a câmera. Verifique as permissões."
       );
+
       setCameraAtiva(false);
       scannerRef.current = null;
     } finally {
@@ -476,6 +571,7 @@ export default function CredenciamentoPage() {
     }
 
     enviandoRef.current = true;
+
     setCarregando(true);
     setErro("");
 
@@ -509,6 +605,7 @@ export default function CredenciamentoPage() {
                 "Content-Type": "application/json",
               },
               credentials: "same-origin",
+              cache: "no-store",
               body: JSON.stringify({ qrToken }),
             }
           )
@@ -534,15 +631,14 @@ export default function CredenciamentoPage() {
           dados.mensagem ||
             "Não foi possível confirmar a entrada."
         );
+
         return;
       }
 
-      // IMPORTANTE:
-      // Manter os dados do ingresso para exibir
-      // escola e código na tela de sucesso.
       setMensagem(
         "O ingresso foi registrado como utilizado."
       );
+
       setTela("sucesso");
     } catch {
       setErro(
@@ -577,6 +673,7 @@ export default function CredenciamentoPage() {
     }
 
     enviandoRef.current = true;
+
     setCarregando(true);
     setErro("");
     setTentativasRestantes(null);
@@ -625,12 +722,14 @@ export default function CredenciamentoPage() {
           dados.mensagem ||
             "Não foi possível liberar o ingresso."
         );
+
         return;
       }
 
       setPinGerente("");
       setMotivo("");
       setMostrarPin(false);
+
       setTentativasRestantes(null);
       setBloqueadoAte(null);
 
@@ -643,6 +742,7 @@ export default function CredenciamentoPage() {
           ? {
               ...atual,
               status: "DISPONIVEL",
+              ultimaEntrada: null,
             }
           : atual
       );
@@ -704,9 +804,17 @@ export default function CredenciamentoPage() {
     }
   }
 
+  // ==========================================
+  // ESTADO DA CÂMERA
+  // ==========================================
+
   const cameraAberta =
     tela === "scanner" &&
     (cameraAtiva || iniciandoCamera);
+
+  // ==========================================
+  // INTERFACE
+  // ==========================================
 
   return (
     <main className="relative flex min-h-dvh w-full flex-col overflow-hidden bg-[#070D12] text-white">
@@ -737,6 +845,7 @@ export default function CredenciamentoPage() {
       {/* =====================================
           CABEÇALHO
       ===================================== */}
+
       <header className="relative z-20 shrink-0 border-b border-white/[0.07] bg-black/25 backdrop-blur-xl">
         <div className="mx-auto flex h-[62px] w-full max-w-lg items-center justify-between px-4">
           <div className="flex min-w-0 items-center gap-2.5">
@@ -768,6 +877,7 @@ export default function CredenciamentoPage() {
               <p className="truncate text-[13px] font-semibold">
                 Funcionário {funcionario || "..."}
               </p>
+
               <p className="text-[10px] text-white/40">
                 Credenciamento
               </p>
@@ -807,8 +917,10 @@ export default function CredenciamentoPage() {
       {/* =====================================
           CONTEÚDO
       ===================================== */}
+
       <div className="relative z-10 mx-auto flex w-full max-w-lg flex-1 flex-col px-4 py-5">
         {/* LEITOR REAL — MANTIDO MONTADO */}
+
         <div
           className={
             cameraAberta
@@ -823,6 +935,7 @@ export default function CredenciamentoPage() {
             />
 
             {/* MOLDURA SOBRE A CÂMERA */}
+
             <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
               <div className="relative aspect-square w-[70%] max-w-[270px]">
                 <MolduraScanner ativa />
@@ -830,9 +943,11 @@ export default function CredenciamentoPage() {
             </div>
 
             {/* DEGRADÊ SOBRE A IMAGEM */}
+
             <div className="pointer-events-none absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-black/75 to-transparent" />
 
             {/* LANTERNA */}
+
             {cameraAtiva && lanternaDisponivel && (
               <button
                 type="button"
@@ -853,11 +968,13 @@ export default function CredenciamentoPage() {
             )}
 
             {/* STATUS DE LEITURA */}
+
             <div className="pointer-events-none absolute inset-x-0 bottom-6 flex flex-col items-center gap-2 text-center">
               <Loader2
                 size={24}
                 className="animate-spin text-[#F6CE6D]"
               />
+
               <p className="text-sm font-semibold text-white">
                 {carregando
                   ? "Validando QR Code..."
@@ -878,7 +995,10 @@ export default function CredenciamentoPage() {
           </button>
         </div>
 
-        {/* SCANNER INICIAL */}
+        {/* =====================================
+            SCANNER INICIAL
+        ===================================== */}
+
         {tela === "scanner" && !cameraAberta && (
           <div className="flex flex-1 flex-col items-center justify-center pb-8">
             <div className="relative mb-7 flex aspect-square w-[min(62vw,230px)] items-center justify-center">
@@ -893,6 +1013,7 @@ export default function CredenciamentoPage() {
 
             <h1 className="text-center text-[21px] font-bold leading-tight">
               Aponte a câmera
+
               <span className="block">
                 para o QR Code
               </span>
@@ -931,7 +1052,10 @@ export default function CredenciamentoPage() {
           </div>
         )}
 
-        {/* ERROS */}
+        {/* =====================================
+            ERROS
+        ===================================== */}
+
         {erro && (
           <div
             role="alert"
@@ -952,7 +1076,10 @@ export default function CredenciamentoPage() {
           </div>
         )}
 
-        {/* CARREGAMENTO */}
+        {/* =====================================
+            CARREGAMENTO
+        ===================================== */}
+
         {carregando && tela !== "scanner" && (
           <div className="mb-4 flex items-center justify-center gap-2 rounded-xl border border-[#E7BE69]/20 bg-[#E7BE69]/10 px-4 py-3 text-xs text-[#F6CE6D]">
             <Loader2
@@ -966,13 +1093,18 @@ export default function CredenciamentoPage() {
         {/* =====================================
             INGRESSO DISPONÍVEL
         ===================================== */}
+
         {tela === "formulario" && ingresso && (
           <div className="my-auto w-full py-2">
             {/* CARTÃO VERDE */}
+
             <div className="mb-6 overflow-hidden rounded-[20px] border border-emerald-400/20 bg-gradient-to-br from-[#064B32] via-[#063D2C] to-[#08291F] p-5 shadow-[0_14px_45px_rgba(0,0,0,0.25)]">
               <div className="mb-4 flex items-center gap-2.5">
                 <div className="flex h-7 w-7 items-center justify-center rounded-full bg-[#22D979] text-[#073C28]">
-                  <Check size={17} strokeWidth={3} />
+                  <Check
+                    size={17}
+                    strokeWidth={3}
+                  />
                 </div>
 
                 <span className="text-sm font-semibold text-emerald-50">
@@ -1014,7 +1146,9 @@ export default function CredenciamentoPage() {
                 <input
                   id="nome"
                   value={nome}
-                  onChange={(e) => setNome(e.target.value)}
+                  onChange={(e) =>
+                    setNome(e.target.value)
+                  }
                   required
                   maxLength={100}
                   autoComplete="given-name"
@@ -1070,9 +1204,9 @@ export default function CredenciamentoPage() {
         {/* =====================================
             ENTRADA CONFIRMADA
         ===================================== */}
+
         {tela === "sucesso" && (
           <div className="my-auto w-full py-6 text-center">
-            {/* ÍCONE VERDE ILUMINADO */}
             <div className="relative mx-auto mb-7 flex h-32 w-32 items-center justify-center">
               <div className="absolute inset-2 rounded-full bg-lime-400/20 blur-[35px]" />
 
@@ -1084,7 +1218,6 @@ export default function CredenciamentoPage() {
                 className="relative text-[#A7F04A] drop-shadow-[0_0_18px_rgba(163,230,53,0.55)]"
               />
 
-              {/* CONFETES DISCRETOS */}
               <span className="absolute left-0 top-7 h-2 w-1 rotate-[-35deg] rounded-full bg-[#F5C95F]" />
               <span className="absolute right-1 top-4 h-2 w-1 rotate-[30deg] rounded-full bg-[#F5C95F]" />
               <span className="absolute bottom-5 left-3 h-1 w-2 rotate-[25deg] rounded-full bg-[#F5C95F]" />
@@ -1124,9 +1257,11 @@ export default function CredenciamentoPage() {
         {/* =====================================
             INGRESSO JÁ UTILIZADO
         ===================================== */}
+
         {tela === "bloqueado" && (
           <div className="my-auto w-full py-6 text-center">
             {/* ÍCONE VERMELHO ILUMINADO */}
+
             <div className="relative mx-auto mb-7 flex h-32 w-32 items-center justify-center">
               <div className="absolute inset-2 rounded-full bg-red-500/20 blur-[38px]" />
 
@@ -1141,6 +1276,7 @@ export default function CredenciamentoPage() {
 
             <h1 className="text-[27px] font-extrabold uppercase leading-tight tracking-tight text-[#FF6668]">
               Ingresso já
+
               <span className="block">
                 utilizado
               </span>
@@ -1156,6 +1292,25 @@ export default function CredenciamentoPage() {
                   ingresso={ingresso}
                   vermelho
                 />
+              </div>
+            )}
+
+            {/* =====================================
+                NOVO: IDENTIFICAÇÃO DO PARTICIPANTE
+            ===================================== */}
+
+            {ingresso?.ultimaEntrada && (
+              <CartaoUltimaEntrada
+                entrada={ingresso.ultimaEntrada}
+              />
+            )}
+
+            {ingresso && !ingresso.ultimaEntrada && (
+              <div className="mt-4 rounded-xl border border-red-400/15 bg-red-500/5 px-4 py-3 text-left">
+                <p className="text-xs text-white/60">
+                  Não foi encontrado um registro de entrada
+                  associado a este ingresso.
+                </p>
               </div>
             )}
 
@@ -1186,6 +1341,7 @@ export default function CredenciamentoPage() {
         {/* =====================================
             INGRESSO CANCELADO
         ===================================== */}
+
         {tela === "cancelado" && (
           <div className="my-auto w-full py-6 text-center">
             <div className="relative mx-auto mb-6 flex h-28 w-28 items-center justify-center">
@@ -1232,6 +1388,7 @@ export default function CredenciamentoPage() {
         {/* =====================================
             LIBERAÇÃO GERENCIAL
         ===================================== */}
+
         {tela === "liberacao" && (
           <div className="my-auto w-full py-4">
             <div className="mb-5 text-center">
@@ -1387,6 +1544,7 @@ export default function CredenciamentoPage() {
                 ) : (
                   <UnlockKeyhole size={19} />
                 )}
+
                 Autorizar liberação
               </button>
 

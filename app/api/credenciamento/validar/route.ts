@@ -1,4 +1,3 @@
-
 import { NextRequest, NextResponse } from "next/server";
 
 import { prisma } from "@/lib/prisma";
@@ -17,7 +16,12 @@ function respostaErro(
       sucesso: false,
       mensagem,
     },
-    { status }
+    {
+      status,
+      headers: {
+        "Cache-Control": "no-store",
+      },
+    }
   );
 }
 
@@ -40,7 +44,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Somente funcionários podem validar ingressos.
     if (session.role !== "FUNCIONARIO") {
       return respostaErro(
         "Operação disponível apenas para funcionários.",
@@ -67,10 +70,7 @@ export async function POST(request: NextRequest) {
       !usuario.ativo ||
       usuario.role !== "FUNCIONARIO"
     ) {
-      return respostaErro(
-        "Acesso negado.",
-        403
-      );
+      return respostaErro("Acesso negado.", 403);
     }
 
     // ======================================
@@ -100,10 +100,7 @@ export async function POST(request: NextRequest) {
       typeof qrToken !== "string" ||
       !/^[a-f0-9]{64}$/i.test(qrToken)
     ) {
-      return respostaErro(
-        "QR Code inválido.",
-        400
-      );
+      return respostaErro("QR Code inválido.", 400);
     }
 
     // ======================================
@@ -124,6 +121,18 @@ export async function POST(request: NextRequest) {
             ativa: true,
           },
         },
+        entradas: {
+          orderBy: [
+            { horario: "desc" },
+            { id: "desc" },
+          ],
+          take: 1,
+          select: {
+            nome: true,
+            sobrenome: true,
+            horario: true,
+          },
+        },
       },
     });
 
@@ -135,21 +144,44 @@ export async function POST(request: NextRequest) {
     }
 
     // ======================================
-    // 6. RETORNAR RESULTADO
+    // 6. IDENTIFICAR ÚLTIMO PARTICIPANTE
     // ======================================
 
-    return NextResponse.json({
-      sucesso: true,
-      status: ingresso.status,
-      ingresso: {
-        id: ingresso.id,
-        codigo: ingresso.codigo,
+    const ultimaEntrada =
+      ingresso.status === "UTILIZADO"
+        ? ingresso.entradas[0] ?? null
+        : null;
+
+    // ======================================
+    // 7. RETORNAR RESULTADO
+    // ======================================
+
+    return NextResponse.json(
+      {
+        sucesso: true,
         status: ingresso.status,
-        escola: {
-          nome: ingresso.escola.nome,
+        ingresso: {
+          id: ingresso.id,
+          codigo: ingresso.codigo,
+          status: ingresso.status,
+          escola: {
+            nome: ingresso.escola.nome,
+          },
+          ultimaEntrada: ultimaEntrada
+            ? {
+                nome: ultimaEntrada.nome,
+                sobrenome: ultimaEntrada.sobrenome,
+                horario: ultimaEntrada.horario.toISOString(),
+              }
+            : null,
         },
       },
-    });
+      {
+        headers: {
+          "Cache-Control": "no-store",
+        },
+      }
+    );
   } catch (error) {
     console.error(
       "Erro ao validar ingresso:",

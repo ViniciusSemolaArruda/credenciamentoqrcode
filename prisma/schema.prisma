@@ -1,0 +1,166 @@
+
+generator client {
+  provider = "prisma-client"
+  output   = "../app/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ==========================================
+// ENUMS
+// ==========================================
+
+enum Role {
+  ADMIN
+  FUNCIONARIO
+}
+
+enum StatusIngresso {
+  DISPONIVEL
+  UTILIZADO
+  CANCELADO
+}
+
+// ==========================================
+// USUÁRIOS
+// ==========================================
+
+model Usuario {
+  id        String  @id @default(cuid())
+  nome      String
+  email     String  @unique
+  senhaHash String
+  role      Role    @default(FUNCIONARIO)
+  ativo     Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  entradas            Entrada[]
+  liberacoesAutorizadas LiberacaoIngresso[] @relation("GerenteAutorizador")
+}
+
+// ==========================================
+// ESCOLAS DE SAMBA
+// ==========================================
+
+model Escola {
+  id     String  @id @default(cuid())
+  nome   String  @unique
+  sigla  String?
+  limite Int     @default(20)
+  ativa  Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  ingressos Ingresso[]
+}
+
+// ==========================================
+// INGRESSOS E QR CODES
+// ==========================================
+
+model Ingresso {
+  id      String         @id @default(cuid())
+  codigo  String         @unique
+  qrToken String         @unique
+  numero  Int
+  status  StatusIngresso @default(DISPONIVEL)
+
+  escolaId String
+  escola   Escola @relation(fields: [escolaId], references: [id])
+
+  // Um ingresso pode ter várias entradas no histórico.
+  entradas Entrada[]
+
+  // Histórico das liberações autorizadas.
+  liberacoes LiberacaoIngresso[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([escolaId, numero])
+  @@index([escolaId, status])
+}
+
+// ==========================================
+// REGISTROS DE ENTRADA
+// ==========================================
+
+model Entrada {
+  id        String   @id @default(cuid())
+  nome      String
+  sobrenome String
+  horario   DateTime @default(now())
+
+  funcionarioNumero Int?
+
+  // A entrada permanece registrada mesmo após liberação.
+  ingressoId String
+  ingresso   Ingresso @relation(fields: [ingressoId], references: [id])
+
+  usuarioId String
+  usuario   Usuario @relation(fields: [usuarioId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@index([ingressoId])
+  @@index([usuarioId])
+  @@index([horario])
+  @@index([funcionarioNumero])
+}
+
+// ==========================================
+// HISTÓRICO DE LIBERAÇÕES
+// ==========================================
+
+model LiberacaoIngresso {
+  id String @id @default(cuid())
+
+  ingressoId String
+  ingresso   Ingresso @relation(fields: [ingressoId], references: [id])
+
+  // Conta do gerente que autorizou.
+  gerenteId String
+  gerente   Usuario @relation("GerenteAutorizador", fields: [gerenteId], references: [id])
+
+  // Funcionário que solicitou a liberação.
+  funcionarioNumero Int
+
+  motivo String
+
+  autorizadoEm DateTime @default(now())
+
+  // Identifica a entrada anterior à liberação.
+  entradaAnteriorId String?
+
+  @@index([ingressoId])
+  @@index([gerenteId])
+  @@index([autorizadoEm])
+}
+
+
+
+model ControlePinGerente {
+  id               String   @id
+  tentativas       Int      @default(0)
+  bloqueadoAte     DateTime?
+  atualizadoEm     DateTime @updatedAt
+}
+
+model TentativaPinGerente {
+  id                String   @id @default(cuid())
+  funcionarioId     String
+  funcionarioNumero Int
+  ingressoId        String?
+  resultado         String
+  criadoEm          DateTime @default(now())
+
+  @@index([criadoEm])
+  @@index([funcionarioId])
+  @@index([resultado])
+}
+

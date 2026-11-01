@@ -38,8 +38,8 @@ model Usuario {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  entradas            Entrada[]
-  liberacoesAutorizadas LiberacaoIngresso[] @relation("GerenteAutorizador")
+  entradas              Entrada[]
+  liberacoesAutorizadas  LiberacaoIngresso[] @relation("GerenteAutorizador")
 }
 
 // ==========================================
@@ -79,12 +79,50 @@ model Ingresso {
   // Histórico das liberações autorizadas.
   liberacoes LiberacaoIngresso[]
 
+  // Retirada pública do QR Code.
+  // Cada ingresso poderá ser retirado apenas uma vez.
+  retirada RetiradaIngresso?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@unique([escolaId, numero])
   @@index([escolaId, status])
 }
+
+// ==========================================
+// RETIRADA PÚBLICA DOS QR CODES
+// ==========================================
+
+
+model RetiradaIngresso {
+  id String @id @default(cuid())
+
+  // Ingresso original
+  ingressoId String @unique
+  ingresso   Ingresso @relation(fields: [ingressoId], references: [id], onDelete: Restrict)
+
+  // Dados do participante
+  nomeCompleto String
+  email        String
+
+  // Data da retirada
+  retiradoEm DateTime @default(now())
+
+  // Controle administrativo
+  ativo Boolean @default(true)
+
+  // Controle de envio manual por e-mail
+  emailEnviadoEm    DateTime?
+  emailEnviadoPorId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([email])
+  @@index([retiradoEm])
+}
+
 
 // ==========================================
 // REGISTROS DE ENTRADA
@@ -142,7 +180,9 @@ model LiberacaoIngresso {
   @@index([autorizadoEm])
 }
 
-
+// ==========================================
+// CONTROLE DO PIN DO GERENTE
+// ==========================================
 
 model ControlePinGerente {
   id               String   @id
@@ -150,6 +190,10 @@ model ControlePinGerente {
   bloqueadoAte     DateTime?
   atualizadoEm     DateTime @updatedAt
 }
+
+// ==========================================
+// TENTATIVAS DE PIN DO GERENTE
+// ==========================================
 
 model TentativaPinGerente {
   id                String   @id @default(cuid())
@@ -163,4 +207,3 @@ model TentativaPinGerente {
   @@index([funcionarioId])
   @@index([resultado])
 }
-

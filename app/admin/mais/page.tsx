@@ -9,6 +9,7 @@ import {
   School,
   LayoutDashboard,
   Settings2,
+  TicketCheck,
 } from "lucide-react";
 
 import LogoutButton from "./LogoutButton";
@@ -18,6 +19,13 @@ import LogoutButton from "./LogoutButton";
 // ==========================================
 
 const opcoes = [
+  {
+    titulo: "Retiradas de ingressos",
+    descricao:
+      "Consultar participantes, QR Codes e envios por e-mail",
+    href: "/admin/retiradas",
+    icone: TicketCheck,
+  },
   {
     titulo: "Segurança do PIN",
     descricao: "Tentativas de autorização e bloqueios",

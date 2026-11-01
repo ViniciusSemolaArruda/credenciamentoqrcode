@@ -17,14 +17,14 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: {
-    default: "Credenciamento | Guardiões da Capadócia",
-    template: "%s | Guardiões da Capadócia",
+    default: "Credenciamento | Festival Todo Mundo no Samba",
+    template: "%s | Festival Todo Mundo no Samba",
   },
 
   description:
-    "Sistema oficial de credenciamento da G.R.E.S. Guardiões da Capadócia.",
+    "Sistema oficial de credenciamento do Festival Todo Mundo no Samba.",
 
-  applicationName: "Credenciamento Capadócia",
+  applicationName: "Credenciamento Festival Todo Mundo no Samba",
 
   icons: {
     icon: [
@@ -67,7 +67,7 @@ export const metadata: Metadata = {
 
   appleWebApp: {
     capable: true,
-    title: "Credenciamento",
+    title: "Credenciamento Festival Todo Mundo no Samba",
     statusBarStyle: "black-translucent",
   },
 

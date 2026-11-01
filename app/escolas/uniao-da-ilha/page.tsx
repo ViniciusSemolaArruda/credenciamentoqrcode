@@ -378,7 +378,7 @@ export default function UniaoDaIlhaPage() {
         <div className="relative z-20 flex w-full justify-center px-3 pt-4 sm:px-4 sm:pt-5 lg:pt-2">
           <div className="relative h-[205px] w-[290px] max-w-full sm:h-[215px] sm:w-[310px] lg:h-[205px] lg:w-[290px]">
             <Image
-              src="/logo-festival.png"
+              src="/logo-festival1.png"
               alt="Festival Todo Mundo no Samba — Carnaval 2027 Série Ouro"
               fill
               priority

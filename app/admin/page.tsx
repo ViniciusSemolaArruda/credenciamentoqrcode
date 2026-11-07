@@ -3,6 +3,7 @@ import { Suspense } from "react";
 import { connection } from "next/server";
 import Image from "next/image";
 import Link from "next/link";
+
 import { prisma } from "@/lib/prisma";
 import AutoRefresh from "@/app/components/AutoRefresh";
 
@@ -12,6 +13,7 @@ import {
   XCircle,
   ArrowRight,
   Clock3,
+  ScanLine,
 } from "lucide-react";
 
 type Periodo = "hoje" | "7dias" | "30dias";
@@ -92,10 +94,9 @@ async function PainelConteudo({
 }: {
   periodo: Periodo;
 }) {
-  // IMPORTANTE:
   // Aguarda uma requisição real antes de calcular
-  // a data atual. Corrige o erro de prerenderização
-  // do Next.js 16 com cacheComponents habilitado.
+  // a data atual. Compatível com Next.js 16
+  // e cacheComponents habilitado.
   await connection();
 
   const inicio = obterInicioPeriodo(periodo);
@@ -232,11 +233,43 @@ async function PainelConteudo({
         </div>
 
         {/* ======================================
+            NOVO: VERIFICADOR DE QR CODE
+        ====================================== */}
+
+        <Link
+          href="/admin/verificar-qrcode"
+          className="group mb-5 flex items-center gap-3 rounded-2xl border border-[#F4C75D]/25 bg-gradient-to-r from-[#2C2518] to-[#141D25] p-4 transition hover:border-[#F4C75D]/60 hover:brightness-110"
+        >
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[#F4C75D]/10">
+            <ScanLine
+              size={25}
+              className="text-[#F4C75D]"
+            />
+          </div>
+
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-bold text-white">
+              Verificar QR Code
+            </p>
+
+            <p className="mt-1 text-[11px] leading-relaxed text-white/45">
+              Identificar escola, ingresso e situação
+            </p>
+          </div>
+
+          <ArrowRight
+            size={19}
+            className="shrink-0 text-[#F4C75D] transition-transform group-hover:translate-x-1"
+          />
+        </Link>
+
+        {/* ======================================
             ESTATÍSTICAS
         ====================================== */}
 
         <section className="grid grid-cols-3 gap-2.5">
           {/* ENTRADAS */}
+
           <div className="min-w-0 rounded-2xl border border-emerald-500/25 bg-gradient-to-b from-[#103327] to-[#0A1E1B] px-2 py-4 text-center">
             <div className="mx-auto mb-2 flex h-8 w-8 items-center justify-center rounded-full bg-emerald-500/15">
               <CheckCircle2
@@ -255,6 +288,7 @@ async function PainelConteudo({
           </div>
 
           {/* LIBERAÇÕES */}
+
           <div className="min-w-0 rounded-2xl border border-amber-400/25 bg-gradient-to-b from-[#342A14] to-[#211C12] px-2 py-4 text-center">
             <div className="mx-auto mb-2 flex h-8 w-8 items-center justify-center rounded-full bg-amber-400/15">
               <UnlockKeyhole
@@ -273,6 +307,7 @@ async function PainelConteudo({
           </div>
 
           {/* CANCELADOS */}
+
           <div className="min-w-0 rounded-2xl border border-red-500/25 bg-gradient-to-b from-[#35191C] to-[#211215] px-2 py-4 text-center">
             <div className="mx-auto mb-2 flex h-8 w-8 items-center justify-center rounded-full bg-red-500/15">
               <XCircle
@@ -370,7 +405,10 @@ async function PainelConteudo({
           )}
         </section>
 
-        {/* RODAPÉ */}
+        {/* ======================================
+            RODAPÉ
+        ====================================== */}
+
         <p className="mt-6 text-center text-[10px] text-white/30">
           G.R.E.S. Guardiões da Capadócia
         </p>

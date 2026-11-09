@@ -23,7 +23,12 @@ function respostaErro(
       sucesso: false,
       mensagem,
     },
-    { status }
+    {
+      status,
+      headers: {
+        "Cache-Control": "no-store",
+      },
+    }
   );
 }
 
@@ -161,7 +166,7 @@ export async function POST(request: NextRequest) {
     }
 
     // ======================================
-    // 7. LOCALIZAR INGRESSO
+    // 7. BUSCAR INGRESSO DE ESCOLA
     // ======================================
 
     const ingresso = await prisma.ingresso.findUnique({
@@ -174,21 +179,111 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    if (!ingresso) {
+    // ======================================
+    // 8. FLUXO ORIGINAL DAS ESCOLAS
+    // ======================================
+
+    if (ingresso) {
+      if (ingresso.status === "UTILIZADO") {
+        return respostaErro(
+          "INGRESSO JÁ UTILIZADO",
+          409
+        );
+      }
+
+      if (ingresso.status === "CANCELADO") {
+        return respostaErro(
+          "INGRESSO CANCELADO",
+          409
+        );
+      }
+
+      // Mantemos a mesma transação original.
+      const entrada = await prisma.$transaction(
+        async (tx) => {
+          const resultado = await tx.ingresso.updateMany({
+            where: {
+              id: ingresso.id,
+              status: "DISPONIVEL",
+            },
+            data: {
+              status: "UTILIZADO",
+            },
+          });
+
+          if (resultado.count !== 1) {
+            throw new IngressoIndisponivelError();
+          }
+
+          return tx.entrada.create({
+            data: {
+              nome: nomeLimpo,
+              sobrenome: sobrenomeLimpo,
+              ingressoId: ingresso.id,
+              usuarioId: usuario.id,
+              funcionarioNumero,
+            },
+          });
+        }
+      );
+
+      return NextResponse.json(
+        {
+          sucesso: true,
+          mensagem: "ENTRADA CONFIRMADA COM SUCESSO!",
+          entrada: {
+            id: entrada.id,
+            nome: entrada.nome,
+            sobrenome: entrada.sobrenome,
+            funcionarioNumero:
+              entrada.funcionarioNumero,
+            horario: entrada.horario,
+          },
+        },
+        {
+          headers: {
+            "Cache-Control": "no-store",
+          },
+        }
+      );
+    }
+
+    // ======================================
+    // 9. BUSCAR INGRESSO INDIVIDUAL
+    // ======================================
+
+    const ingressoIndividual =
+      await prisma.ingressoConvidado.findUnique({
+        where: {
+          qrToken,
+        },
+        select: {
+          id: true,
+          codigo: true,
+          categoria: true,
+          status: true,
+        },
+      });
+
+    if (!ingressoIndividual) {
       return respostaErro(
         "Ingresso não encontrado.",
         404
       );
     }
 
-    if (ingresso.status === "UTILIZADO") {
+    // ======================================
+    // 10. VERIFICAR STATUS INDIVIDUAL
+    // ======================================
+
+    if (ingressoIndividual.status === "UTILIZADO") {
       return respostaErro(
         "INGRESSO JÁ UTILIZADO",
         409
       );
     }
 
-    if (ingresso.status === "CANCELADO") {
+    if (ingressoIndividual.status === "CANCELADO") {
       return respostaErro(
         "INGRESSO CANCELADO",
         409
@@ -196,38 +291,37 @@ export async function POST(request: NextRequest) {
     }
 
     // ======================================
-    // 8. TRANSAÇÃO ATÔMICA
+    // 11. TRANSAÇÃO ATÔMICA INDIVIDUAL
     // ======================================
 
-    const entrada = await prisma.$transaction(
+    const entradaIndividual = await prisma.$transaction(
       async (tx) => {
-        // A condição DISPONIVEL é fundamental:
-        // somente uma requisição simultânea
-        // poderá atualizar o ingresso.
-
-        const resultado = await tx.ingresso.updateMany({
-          where: {
-            id: ingresso.id,
-            status: "DISPONIVEL",
-          },
-          data: {
-            status: "UTILIZADO",
-          },
-        });
+        // Apenas um funcionário consegue mudar
+        // o status de DISPONIVEL para UTILIZADO.
+        const resultado =
+          await tx.ingressoConvidado.updateMany({
+            where: {
+              id: ingressoIndividual.id,
+              status: "DISPONIVEL",
+            },
+            data: {
+              status: "UTILIZADO",
+            },
+          });
 
         if (resultado.count !== 1) {
           throw new IngressoIndisponivelError();
         }
 
-        // Criar a entrada na mesma transação.
-        // Se esta operação falhar, a atualização
-        // do ingresso também será revertida.
-
-        return tx.entrada.create({
+        // Cada ingresso individual possui
+        // apenas um registro de entrada.
+        // O banco também protege essa regra
+        // através do campo @unique.
+        return tx.entradaConvidado.create({
           data: {
             nome: nomeLimpo,
             sobrenome: sobrenomeLimpo,
-            ingressoId: ingresso.id,
+            ingressoConvidadoId: ingressoIndividual.id,
             usuarioId: usuario.id,
             funcionarioNumero,
           },
@@ -236,24 +330,42 @@ export async function POST(request: NextRequest) {
     );
 
     // ======================================
-    // 9. CONFIRMAÇÃO
+    // 12. CONFIRMAÇÃO INDIVIDUAL
     // ======================================
 
-    return NextResponse.json({
-      sucesso: true,
-      mensagem: "ENTRADA CONFIRMADA COM SUCESSO!",
-      entrada: {
-        id: entrada.id,
-        nome: entrada.nome,
-        sobrenome: entrada.sobrenome,
-        funcionarioNumero:
-          entrada.funcionarioNumero,
-        horario: entrada.horario,
+    const nomeCategoria =
+      ingressoIndividual.categoria === "PRESIDENCIA"
+        ? "Presidência"
+        : "Pista";
+
+    return NextResponse.json(
+      {
+        sucesso: true,
+        tipo: "INDIVIDUAL",
+        mensagem: "ENTRADA CONFIRMADA COM SUCESSO!",
+        ingresso: {
+          codigo: ingressoIndividual.codigo,
+          categoria: ingressoIndividual.categoria,
+          nomeCategoria,
+        },
+        entrada: {
+          id: entradaIndividual.id,
+          nome: entradaIndividual.nome,
+          sobrenome: entradaIndividual.sobrenome,
+          funcionarioNumero:
+            entradaIndividual.funcionarioNumero,
+          horario: entradaIndividual.horario,
+        },
       },
-    });
+      {
+        headers: {
+          "Cache-Control": "no-store",
+        },
+      }
+    );
   } catch (error) {
     // ======================================
-    // 10. CONFLITO ENTRE FUNCIONÁRIOS
+    // 13. CONFLITO ENTRE FUNCIONÁRIOS
     // ======================================
 
     if (error instanceof IngressoIndisponivelError) {
@@ -264,7 +376,7 @@ export async function POST(request: NextRequest) {
     }
 
     // ======================================
-    // 11. ERRO INTERNO
+    // 14. ERRO INTERNO
     // ======================================
 
     console.error(

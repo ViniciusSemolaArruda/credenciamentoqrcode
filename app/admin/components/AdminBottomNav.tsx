@@ -3,12 +3,18 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+
 import {
   LayoutDashboard,
   History,
   School,
+  Ticket,
   Menu,
 } from "lucide-react";
+
+// ==========================================
+// ITENS DO MENU
+// ==========================================
 
 const itens = [
   {
@@ -27,11 +33,20 @@ const itens = [
     icone: School,
   },
   {
+    nome: "Ingressos",
+    href: "/admin/ingressos-individuais",
+    icone: Ticket,
+  },
+  {
     nome: "Mais",
     href: "/admin/mais",
     icone: Menu,
   },
 ];
+
+// ==========================================
+// COMPONENTE
+// ==========================================
 
 export default function AdminBottomNav() {
   const pathname = usePathname();
@@ -45,17 +60,15 @@ export default function AdminBottomNav() {
           "env(safe-area-inset-bottom, 0px)",
       }}
     >
-      <div className="mx-auto grid h-[68px] max-w-lg grid-cols-4">
+      <div className="mx-auto grid h-[68px] max-w-lg grid-cols-5">
         {itens.map((item) => {
           const ativo =
             item.href === "/admin"
               ? pathname === "/admin"
-              : item.href === "/admin/escolas"
-                ? pathname.startsWith("/admin/escolas")
-                : item.href === "/admin/mais"
-                  ? pathname === "/admin/mais" ||
-                    pathname.startsWith("/admin/seguranca")
-                  : pathname.startsWith(item.href);
+              : item.href === "/admin/mais"
+                ? pathname === "/admin/mais" ||
+                  pathname.startsWith("/admin/seguranca")
+                : pathname.startsWith(item.href);
 
           const Icone = item.icone;
 
@@ -64,7 +77,7 @@ export default function AdminBottomNav() {
               key={item.href}
               href={item.href}
               aria-current={ativo ? "page" : undefined}
-              className={`relative flex flex-col items-center justify-center gap-1 transition ${
+              className={`relative flex min-w-0 flex-col items-center justify-center gap-1 transition ${
                 ativo
                   ? "text-[#F4C75D]"
                   : "text-[#85909C] hover:text-white"

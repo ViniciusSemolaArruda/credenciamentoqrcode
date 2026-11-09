@@ -11,72 +11,108 @@ import HistoricoClient from "./HistoricoClient";
 // ==========================================
 
 async function HistoricoContent() {
-  // Verificar permissão do gerente
+  // Verificar permissão do gerente.
   await requireRole("ADMIN");
 
   // ==========================================
   // CONSULTAR REGISTROS NO POSTGRESQL
   // ==========================================
 
-  const [entradas, liberacoes, ingressosUtilizados] =
-    await Promise.all([
-      prisma.entrada.findMany({
-        orderBy: [
-          { horario: "desc" },
-          { id: "desc" },
-        ],
-        include: {
-          ingresso: {
-            select: {
-              codigo: true,
-              escola: {
-                select: {
-                  nome: true,
-                },
+  const [
+    entradas,
+    entradasIndividuais,
+    liberacoes,
+    ingressosUtilizadosEscolas,
+    ingressosUtilizadosIndividuais,
+  ] = await Promise.all([
+    // Entradas das escolas de samba.
+    prisma.entrada.findMany({
+      orderBy: [
+        { horario: "desc" },
+        { id: "desc" },
+      ],
+      include: {
+        ingresso: {
+          select: {
+            codigo: true,
+            escola: {
+              select: {
+                nome: true,
               },
             },
           },
-          usuario: {
-            select: {
-              nome: true,
-            },
+        },
+        usuario: {
+          select: {
+            nome: true,
           },
         },
-      }),
+      },
+    }),
 
-      prisma.liberacaoIngresso.findMany({
-        orderBy: [
-          { autorizadoEm: "desc" },
-          { id: "desc" },
-        ],
-        include: {
-          ingresso: {
-            select: {
-              codigo: true,
-              escola: {
-                select: {
-                  nome: true,
-                },
+    // Entradas de Presidência e Pista.
+    prisma.entradaConvidado.findMany({
+      orderBy: [
+        { horario: "desc" },
+        { id: "desc" },
+      ],
+      include: {
+        ingressoConvidado: {
+          select: {
+            codigo: true,
+            categoria: true,
+          },
+        },
+        usuario: {
+          select: {
+            nome: true,
+          },
+        },
+      },
+    }),
+
+    // Liberações gerenciais das escolas.
+    prisma.liberacaoIngresso.findMany({
+      orderBy: [
+        { autorizadoEm: "desc" },
+        { id: "desc" },
+      ],
+      include: {
+        ingresso: {
+          select: {
+            codigo: true,
+            escola: {
+              select: {
+                nome: true,
               },
             },
           },
-          gerente: {
-            select: {
-              nome: true,
-            },
+        },
+        gerente: {
+          select: {
+            nome: true,
           },
         },
-      }),
+      },
+    }),
 
-      prisma.ingresso.count({
-        where: {
-          status: "UTILIZADO",
-        },
-      }),
-    ]);
+    // Ingressos utilizados das escolas.
+    prisma.ingresso.count({
+      where: {
+        status: "UTILIZADO",
+      },
+    }),
+
+    // Ingressos individuais utilizados.
+    prisma.ingressoConvidado.count({
+      where: {
+        status: "UTILIZADO",
+      },
+    }),
+  ]);
 
   // ==========================================
-  // ORGANIZAR REGISTROS DE ENTRADA
+  // ORGANIZAR ENTRADAS DAS ESCOLAS
   // ==========================================
 
   const registrosEntradas = entradas.map((entrada) => ({
@@ -92,7 +128,28 @@ async function HistoricoContent() {
   }));
 
   // ==========================================
-  // ORGANIZAR REGISTROS DE LIBERAÇÃO
+  // ORGANIZAR ENTRADAS INDIVIDUAIS
+  // ==========================================
+
+  const registrosIndividuais = entradasIndividuais.map(
+    (entrada) => ({
+      id: entrada.id,
+      tipo: "ENTRADA" as const,
+      nome: `${entrada.nome} ${entrada.sobrenome}`,
+      escola:
+        entrada.ingressoConvidado.categoria === "PRESIDENCIA"
+          ? "Presidência"
+          : "Pista",
+      codigo: entrada.ingressoConvidado.codigo,
+      funcionarioNumero: entrada.funcionarioNumero,
+      data: entrada.horario.toISOString(),
+      motivo: null as string | null,
+      gerente: null as string | null,
+    })
+  );
+
+  // ==========================================
+  // ORGANIZAR LIBERAÇÕES DAS ESCOLAS
   // ==========================================
 
   const registrosLiberacoes = liberacoes.map(
@@ -110,17 +167,31 @@ async function HistoricoContent() {
   );
 
   // ==========================================
-  // UNIFICAR E ORDENAR REGISTROS
+  // UNIFICAR E ORDENAR TODOS OS REGISTROS
   // ==========================================
 
   const registros = [
     ...registrosEntradas,
+    ...registrosIndividuais,
     ...registrosLiberacoes,
   ].sort(
     (a, b) =>
       new Date(b.data).getTime() -
       new Date(a.data).getTime()
   );
+
+  // ==========================================
+  // CALCULAR ESTATÍSTICAS GERAIS
+  // ==========================================
+
+  const totalEntradas =
+    entradas.length + entradasIndividuais.length;
+
+  const totalLiberacoes = liberacoes.length;
+
+  const ingressosUtilizados =
+    ingressosUtilizadosEscolas +
+    ingressosUtilizadosIndividuais;
 
   // ==========================================
   // RENDERIZAR PÁGINA
@@ -131,10 +202,10 @@ async function HistoricoContent() {
       <AutoRefresh intervalo={5000} />
 
       {/* EFEITO SUAVE NO FUNDO */}
+
       <div className="pointer-events-none absolute inset-x-0 top-0 h-80 bg-[radial-gradient(ellipse_at_top,rgba(33,54,61,0.35),transparent_70%)]" />
 
       <div className="relative mx-auto w-full max-w-lg px-4 pb-8 pt-5">
-
         {/* ======================================
             HEADER — MESMO PADRÃO DO PAINEL
         ====================================== */}
@@ -172,8 +243,8 @@ async function HistoricoContent() {
 
         <HistoricoClient
           registros={registros}
-          totalEntradas={entradas.length}
-          totalLiberacoes={liberacoes.length}
+          totalEntradas={totalEntradas}
+          totalLiberacoes={totalLiberacoes}
           ingressosUtilizados={ingressosUtilizados}
         />
       </div>

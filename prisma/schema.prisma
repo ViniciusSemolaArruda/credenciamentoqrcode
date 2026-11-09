@@ -22,6 +22,11 @@ enum StatusIngresso {
   CANCELADO
 }
 
+enum CategoriaConvidado {
+  PRESIDENCIA
+  PISTA
+}
+
 // ==========================================
 // USUÁRIOS
 // ==========================================
@@ -60,7 +65,7 @@ model Escola {
 }
 
 // ==========================================
-// INGRESSOS E QR CODES
+// INGRESSOS E QR CODES DAS ESCOLAS
 // ==========================================
 
 model Ingresso {
@@ -97,21 +102,21 @@ model Ingresso {
 model RetiradaIngresso {
   id String @id @default(cuid())
 
-  // Ingresso original
+  // Ingresso original.
   ingressoId String   @unique
   ingresso   Ingresso @relation(fields: [ingressoId], references: [id], onDelete: Restrict)
 
-  // Dados do participante
+  // Dados do participante.
   nomeCompleto String
   email        String
 
-  // Data da retirada
+  // Data da retirada.
   retiradoEm DateTime @default(now())
 
-  // Controle administrativo
+  // Controle administrativo.
   ativo Boolean @default(true)
 
-  // Controle de envio manual por e-mail
+  // Controle de envio manual por e-mail.
   emailEnviadoEm    DateTime?
   emailEnviadoPorId String?
 
@@ -123,7 +128,7 @@ model RetiradaIngresso {
 }
 
 // ==========================================
-// REGISTROS DE ENTRADA
+// REGISTROS DE ENTRADA DAS ESCOLAS
 // ==========================================
 
 model Entrada {
@@ -207,43 +212,47 @@ model TentativaPinGerente {
 }
 
 // ==========================================
-// INGRESSOS DE CONVIDADOS
+// INGRESSOS INDIVIDUAIS DE CONVIDADOS
+// PRESIDÊNCIA E PISTA
 // ==========================================
 
 model IngressoConvidado {
-  id      String         @id @default(cuid())
-  codigo  String         @unique
-  qrToken String         @unique
-  numero  Int            @unique
-  status  StatusIngresso @default(DISPONIVEL)
+  id        String             @id @default(cuid())
+  codigo    String             @unique
+  qrToken   String             @unique
+  numero    Int
+  categoria CategoriaConvidado
+  status    StatusIngresso     @default(DISPONIVEL)
 
-  permiteAcompanhante Boolean @default(true)
-
+  // Cada QR Code permite apenas uma entrada.
+  // Não há acompanhantes.
   entrada EntradaConvidado?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@index([status])
+  // Permite PRESIDENCIA-01 e PISTA-01,
+  // mas impede duplicação dentro da mesma categoria.
+  @@unique([categoria, numero])
+  @@index([categoria, status])
 }
 
 // ==========================================
-// REGISTRO DE ENTRADA DOS CONVIDADOS
+// REGISTROS DE ENTRADA DOS CONVIDADOS
 // ==========================================
 
 model EntradaConvidado {
   id String @id @default(cuid())
 
+  // Um registro de entrada por QR Code.
   ingressoConvidadoId String            @unique
   ingressoConvidado   IngressoConvidado @relation(fields: [ingressoConvidadoId], references: [id], onDelete: Restrict)
 
+  // Dados da pessoa credenciada.
   nome      String
   sobrenome String
 
-  comAcompanhante       Boolean @default(false)
-  acompanhanteNome      String?
-  acompanhanteSobrenome String?
-
+  // Funcionário 1, 2 ou 3.
   funcionarioNumero Int
 
   usuarioId String

@@ -140,7 +140,7 @@ export async function POST(request: NextRequest) {
     }
 
     // ==========================================
-    // 4. PROCURAR NOS CONVIDADOS
+    // 4. PROCURAR PRESIDÊNCIA E PISTA
     // ==========================================
 
     const convidado = await prisma.ingressoConvidado.findUnique({
@@ -149,15 +149,12 @@ export async function POST(request: NextRequest) {
         id: true,
         codigo: true,
         numero: true,
+        categoria: true,
         status: true,
-        permiteAcompanhante: true,
         entrada: {
           select: {
             nome: true,
             sobrenome: true,
-            comAcompanhante: true,
-            acompanhanteNome: true,
-            acompanhanteSobrenome: true,
             horario: true,
             funcionarioNumero: true,
           },
@@ -171,14 +168,14 @@ export async function POST(request: NextRequest) {
           sucesso: true,
           reconhecido: true,
           tipo: "CONVIDADO",
+          categoria: convidado.categoria,
           ingresso: {
             id: convidado.id,
             codigo: convidado.codigo,
             numero: convidado.numero,
+            categoria: convidado.categoria,
             status: convidado.status,
-            permiteAcompanhante:
-              convidado.permiteAcompanhante,
-            ultimaEntrada: convidado.entrada,
+            ultimaEntrada: convidado.entrada ?? null,
           },
         },
         {

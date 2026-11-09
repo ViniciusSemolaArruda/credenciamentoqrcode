@@ -8,10 +8,13 @@ import {
   useEffect,
   useRef,
   useState,
+  type FormEvent,
 } from "react";
+
 import { useRouter } from "next/navigation";
 import { Html5Qrcode } from "html5-qrcode";
 import Image from "next/image";
+
 import {
   ArrowLeft,
   ArrowRight,
@@ -27,6 +30,7 @@ import {
   LogOut,
   RefreshCw,
   ShieldCheck,
+  Ticket,
   UnlockKeyhole,
   X,
   XCircle,
@@ -46,9 +50,17 @@ type Ingresso = {
   id: string;
   codigo: string;
   status: string;
+
+  tipo?: "ESCOLA" | "INDIVIDUAL";
+  categoria?: "PRESIDENCIA" | "PISTA" | null;
+  numero?: number;
+  nomeCategoria?: string;
+  permiteAcompanhantes?: boolean;
+
   escola: {
     nome: string;
   };
+
   ultimaEntrada?: UltimaEntrada | null;
 };
 
@@ -74,6 +86,24 @@ const CAMPO =
   "h-[51px] w-full rounded-xl border border-white/15 bg-[#151E26] px-4 text-base text-white outline-none transition placeholder:text-white/35 focus:border-[#E7BE69] focus:ring-2 focus:ring-[#E7BE69]/15";
 
 // ==========================================
+// IDENTIFICAÇÃO DO INGRESSO
+// ==========================================
+
+function ehIndividual(ingresso: Ingresso | null) {
+  return ingresso?.tipo === "INDIVIDUAL";
+}
+
+function nomeDoIngresso(ingresso: Ingresso) {
+  if (ingresso.tipo === "INDIVIDUAL") {
+    return ingresso.categoria === "PRESIDENCIA"
+      ? "Presidência"
+      : "Pista";
+  }
+
+  return ingresso.escola.nome;
+}
+
+// ==========================================
 // CARTÃO DO INGRESSO
 // ==========================================
 
@@ -84,6 +114,8 @@ function CartaoIngresso({
   ingresso: Ingresso;
   vermelho?: boolean;
 }) {
+  const individual = ehIndividual(ingresso);
+
   return (
     <div
       className={`flex items-center gap-3 rounded-2xl border p-3.5 text-left ${
@@ -93,23 +125,39 @@ function CartaoIngresso({
       }`}
     >
       <div className="relative flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-white/15 bg-white/10 p-1">
-        <Image
-          src="/logonova.png"
-          alt="Guardiões da Capadócia"
-          fill
-          sizes="44px"
-          className="object-contain p-1"
-        />
+        {individual ? (
+          <Ticket size={25} className="text-[#F4C75D]" />
+        ) : (
+          <Image
+            src="/logonova.png"
+            alt="Guardiões da Capadócia"
+            fill
+            sizes="44px"
+            className="object-contain p-1"
+          />
+        )}
       </div>
 
-      <div className="min-w-0">
+      <div className="min-w-0 flex-1">
+        {individual && (
+          <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-[#F4C75D]">
+            Ingresso individual
+          </p>
+        )}
+
         <p className="truncate text-sm font-semibold text-white">
-          {ingresso.escola.nome}
+          {nomeDoIngresso(ingresso)}
         </p>
 
         <p className="mt-1 text-xs text-white/50">
           {ingresso.codigo}
         </p>
+
+        {individual && (
+          <p className="mt-1 text-[11px] text-white/50">
+            1 entrada · Sem acompanhantes
+          </p>
+        )}
       </div>
     </div>
   );
@@ -194,7 +242,7 @@ function MolduraScanner({
 // COMPONENTE PRINCIPAL
 // ==========================================
 
-export default function CredenciamentoPage() {
+export default function CredenciamentoClient() {
   const router = useRouter();
 
   const scannerRef = useRef<Html5Qrcode | null>(null);
@@ -555,7 +603,7 @@ export default function CredenciamentoPage() {
   // ==========================================
 
   async function confirmarEntrada(
-    e: React.FormEvent<HTMLFormElement>
+    e: FormEvent<HTMLFormElement>
   ) {
     e.preventDefault();
 
@@ -584,6 +632,7 @@ export default function CredenciamentoPage() {
             "Content-Type": "application/json",
           },
           credentials: "same-origin",
+          cache: "no-store",
           body: JSON.stringify({
             qrToken,
             nome: nome.trim(),
@@ -609,9 +658,7 @@ export default function CredenciamentoPage() {
               body: JSON.stringify({ qrToken }),
             }
           )
-            .then((r) =>
-              r.ok ? r.json() : null
-            )
+            .then((r) => (r.ok ? r.json() : null))
             .catch(() => null);
 
           if (novaConsulta?.sucesso) {
@@ -652,14 +699,23 @@ export default function CredenciamentoPage() {
 
   // ==========================================
   // LIBERAÇÃO GERENCIAL
+  // APENAS INGRESSOS DE ESCOLAS
   // ==========================================
 
   async function liberarIngresso(
-    e: React.FormEvent<HTMLFormElement>
+    e: FormEvent<HTMLFormElement>
   ) {
     e.preventDefault();
 
     if (enviandoRef.current) return;
+
+    // Proteção adicional na interface.
+    if (ehIndividual(ingresso)) {
+      setErro(
+        "Ingressos individuais não permitem liberação gerencial."
+      );
+      return;
+    }
 
     if (
       !qrToken ||
@@ -800,6 +856,7 @@ export default function CredenciamentoPage() {
       setErro(
         "Não foi possível sair. Tente novamente."
       );
+
       setSaindo(false);
     }
   }
@@ -812,6 +869,8 @@ export default function CredenciamentoPage() {
     tela === "scanner" &&
     (cameraAtiva || iniciandoCamera);
 
+  const ingressoIndividual = ehIndividual(ingresso);
+
   // ==========================================
   // INTERFACE
   // ==========================================
@@ -819,12 +878,14 @@ export default function CredenciamentoPage() {
   return (
     <main className="relative flex min-h-dvh w-full flex-col overflow-hidden bg-[#070D12] text-white">
       {/* FUNDO ESCURO PREMIUM */}
+
       <div
         aria-hidden="true"
         className="pointer-events-none fixed inset-0 bg-[radial-gradient(ellipse_at_50%_30%,#19272D_0%,#0B141A_48%,#05090D_100%)]"
       />
 
       {/* ILUMINAÇÃO VERDE */}
+
       {(tela === "sucesso" ||
         tela === "formulario") && (
         <div
@@ -834,6 +895,7 @@ export default function CredenciamentoPage() {
       )}
 
       {/* ILUMINAÇÃO VERMELHA */}
+
       {(tela === "bloqueado" ||
         tela === "cancelado") && (
         <div
@@ -1013,7 +1075,6 @@ export default function CredenciamentoPage() {
 
             <h1 className="text-center text-[21px] font-bold leading-tight">
               Aponte a câmera
-
               <span className="block">
                 para o QR Code
               </span>
@@ -1112,9 +1173,36 @@ export default function CredenciamentoPage() {
                 </span>
               </div>
 
+              {/* IDENTIFICAÇÃO DO TIPO */}
+
+              {ingressoIndividual && (
+                <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-[#F4C75D]/30 bg-[#F4C75D]/10 px-3 py-1.5">
+                  <Ticket
+                    size={14}
+                    className="text-[#F4C75D]"
+                  />
+
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-[#F4C75D]">
+                    Ingresso individual
+                  </span>
+                </div>
+              )}
+
               <h1 className="text-xl font-bold leading-snug">
-                {ingresso.escola.nome}
+                {nomeDoIngresso(ingresso)}
               </h1>
+
+              {ingressoIndividual && (
+                <div className="mt-3 rounded-xl border border-white/10 bg-black/15 px-3 py-3">
+                  <p className="text-sm font-semibold text-emerald-100">
+                    1 entrada por QR Code
+                  </p>
+
+                  <p className="mt-1 text-xs text-emerald-100/65">
+                    Sem direito a acompanhantes.
+                  </p>
+                </div>
+              )}
 
               <p className="mt-5 text-[11px] text-emerald-100/60">
                 Código do ingresso
@@ -1130,6 +1218,8 @@ export default function CredenciamentoPage() {
                 {mensagem}
               </div>
             )}
+
+            {/* FORMULÁRIO ORIGINAL */}
 
             <form
               onSubmit={confirmarEntrada}
@@ -1184,7 +1274,15 @@ export default function CredenciamentoPage() {
                 disabled={carregando}
                 className="flex min-h-[52px] w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-b from-[#29C96B] to-[#148B43] px-4 py-3 text-sm font-bold text-white shadow-[0_8px_25px_rgba(24,169,80,0.18)] transition hover:brightness-110 disabled:opacity-50"
               >
-                <CheckCircle2 size={20} />
+                {carregando ? (
+                  <Loader2
+                    size={20}
+                    className="animate-spin"
+                  />
+                ) : (
+                  <CheckCircle2 size={20} />
+                )}
+
                 Confirmar entrada
               </button>
 
@@ -1260,8 +1358,6 @@ export default function CredenciamentoPage() {
 
         {tela === "bloqueado" && (
           <div className="my-auto w-full py-6 text-center">
-            {/* ÍCONE VERMELHO ILUMINADO */}
-
             <div className="relative mx-auto mb-7 flex h-32 w-32 items-center justify-center">
               <div className="absolute inset-2 rounded-full bg-red-500/20 blur-[38px]" />
 
@@ -1276,7 +1372,6 @@ export default function CredenciamentoPage() {
 
             <h1 className="text-[27px] font-extrabold uppercase leading-tight tracking-tight text-[#FF6668]">
               Ingresso já
-
               <span className="block">
                 utilizado
               </span>
@@ -1295,9 +1390,7 @@ export default function CredenciamentoPage() {
               </div>
             )}
 
-            {/* =====================================
-                NOVO: IDENTIFICAÇÃO DO PARTICIPANTE
-            ===================================== */}
+            {/* IDENTIFICAÇÃO DO PARTICIPANTE */}
 
             {ingresso?.ultimaEntrada && (
               <CartaoUltimaEntrada
@@ -1314,17 +1407,40 @@ export default function CredenciamentoPage() {
               </div>
             )}
 
-            <button
-              type="button"
-              onClick={() => {
-                setErro("");
-                setTela("liberacao");
-              }}
-              className={`${BOTAO_DOURADO} mt-8`}
-            >
-              <UnlockKeyhole size={19} />
-              Solicitar liberação
-            </button>
+            {/* LIBERAÇÃO APENAS PARA ESCOLAS */}
+
+            {ingresso && !ingressoIndividual && (
+              <button
+                type="button"
+                onClick={() => {
+                  setErro("");
+                  setTela("liberacao");
+                }}
+                className={`${BOTAO_DOURADO} mt-8`}
+              >
+                <UnlockKeyhole size={19} />
+                Solicitar liberação
+              </button>
+            )}
+
+            {/* INGRESSOS INDIVIDUAIS */}
+
+            {ingressoIndividual && (
+              <div className="mt-5 rounded-xl border border-[#F4C75D]/20 bg-[#F4C75D]/5 px-4 py-3 text-left">
+                <div className="flex items-start gap-2">
+                  <LockKeyhole
+                    size={17}
+                    className="mt-0.5 shrink-0 text-[#F4C75D]"
+                  />
+
+                  <p className="text-xs leading-relaxed text-white/70">
+                    Ingresso individual de uso único.
+                    Não é permitida uma nova entrada
+                    com este QR Code.
+                  </p>
+                </div>
+              </div>
+            )}
 
             <button
               type="button"
@@ -1387,183 +1503,185 @@ export default function CredenciamentoPage() {
 
         {/* =====================================
             LIBERAÇÃO GERENCIAL
+            SOMENTE ESCOLAS
         ===================================== */}
 
-        {tela === "liberacao" && (
-          <div className="my-auto w-full py-4">
-            <div className="mb-5 text-center">
-              <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-full border border-[#F2C86B]/30 bg-[#F2C86B]/10">
-                <ShieldCheck
-                  size={33}
-                  className="text-[#F2C86B]"
-                />
+        {tela === "liberacao" &&
+          !ingressoIndividual && (
+            <div className="my-auto w-full py-4">
+              <div className="mb-5 text-center">
+                <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-full border border-[#F2C86B]/30 bg-[#F2C86B]/10">
+                  <ShieldCheck
+                    size={33}
+                    className="text-[#F2C86B]"
+                  />
+                </div>
+
+                <h1 className="text-2xl font-bold">
+                  Autorização do gerente
+                </h1>
+
+                <p className="mt-2 text-xs text-white/50">
+                  Liberação excepcional de ingresso.
+                </p>
               </div>
 
-              <h1 className="text-2xl font-bold">
-                Autorização do gerente
-              </h1>
-
-              <p className="mt-2 text-xs text-white/50">
-                Liberação excepcional de ingresso.
-              </p>
-            </div>
-
-            {ingresso && (
-              <div className="mb-5">
-                <CartaoIngresso ingresso={ingresso} />
-              </div>
-            )}
-
-            {tentativasRestantes !== null &&
-              !bloqueadoAte && (
-                <div className="mb-4 rounded-xl border border-amber-400/25 bg-amber-400/10 p-3 text-xs text-amber-200">
-                  Tentativas restantes:{" "}
-                  {tentativasRestantes}
+              {ingresso && (
+                <div className="mb-5">
+                  <CartaoIngresso ingresso={ingresso} />
                 </div>
               )}
 
-            {bloqueadoAte && (
-              <div className="mb-4 rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-200">
-                PIN bloqueado até{" "}
-                {new Intl.DateTimeFormat("pt-BR", {
-                  timeZone: "America/Sao_Paulo",
-                  day: "2-digit",
-                  month: "2-digit",
-                  hour: "2-digit",
-                  minute: "2-digit",
-                }).format(new Date(bloqueadoAte))}{" "}
-                (horário de Brasília).
-              </div>
-            )}
-
-            <form
-              onSubmit={liberarIngresso}
-              className="space-y-4"
-            >
-              <div>
-                <label
-                  htmlFor="motivo"
-                  className="mb-2 block text-xs font-semibold text-white/80"
-                >
-                  Motivo da liberação
-                </label>
-
-                <textarea
-                  id="motivo"
-                  value={motivo}
-                  onChange={(e) =>
-                    setMotivo(e.target.value)
-                  }
-                  required
-                  minLength={5}
-                  maxLength={500}
-                  rows={3}
-                  placeholder="Ex.: Substituição de participante"
-                  className={`${CAMPO} h-auto min-h-[100px] resize-none py-3`}
-                />
-              </div>
-
-              <div>
-                <label
-                  htmlFor="pinGerente"
-                  className="mb-2 block text-xs font-semibold text-white/80"
-                >
-                  PIN especial do gerente
-                </label>
-
-                <div className="relative">
-                  <LockKeyhole
-                    size={18}
-                    className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-white/40"
-                  />
-
-                  <input
-                    id="pinGerente"
-                    type={
-                      mostrarPin
-                        ? "text"
-                        : "password"
-                    }
-                    inputMode="numeric"
-                    autoComplete="off"
-                    value={pinGerente}
-                    onChange={(e) =>
-                      setPinGerente(
-                        e.target.value
-                          .replace(/\D/g, "")
-                          .slice(0, 8)
-                      )
-                    }
-                    required
-                    minLength={8}
-                    maxLength={8}
-                    placeholder="8 dígitos"
-                    className={`${CAMPO} pl-11 pr-12`}
-                  />
-
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setMostrarPin(!mostrarPin)
-                    }
-                    aria-label={
-                      mostrarPin
-                        ? "Ocultar PIN"
-                        : "Mostrar PIN"
-                    }
-                    className="absolute right-2 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center text-white/60"
-                  >
-                    {mostrarPin ? (
-                      <EyeOff size={19} />
-                    ) : (
-                      <Eye size={19} />
-                    )}
-                  </button>
-                </div>
-              </div>
-
-              <button
-                type="submit"
-                disabled={
-                  carregando ||
-                  Boolean(
-                    bloqueadoAte &&
-                      new Date(bloqueadoAte) >
-                        new Date()
-                  ) ||
-                  motivo.trim().length < 5 ||
-                  pinGerente.length !== 8
-                }
-                className={BOTAO_DOURADO}
-              >
-                {carregando ? (
-                  <Loader2
-                    size={19}
-                    className="animate-spin"
-                  />
-                ) : (
-                  <UnlockKeyhole size={19} />
+              {tentativasRestantes !== null &&
+                !bloqueadoAte && (
+                  <div className="mb-4 rounded-xl border border-amber-400/25 bg-amber-400/10 p-3 text-xs text-amber-200">
+                    Tentativas restantes:{" "}
+                    {tentativasRestantes}
+                  </div>
                 )}
 
-                Autorizar liberação
-              </button>
+              {bloqueadoAte && (
+                <div className="mb-4 rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-200">
+                  PIN bloqueado até{" "}
+                  {new Intl.DateTimeFormat("pt-BR", {
+                    timeZone: "America/Sao_Paulo",
+                    day: "2-digit",
+                    month: "2-digit",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  }).format(new Date(bloqueadoAte))}{" "}
+                  (horário de Brasília).
+                </div>
+              )}
 
-              <button
-                type="button"
-                onClick={() => {
-                  setPinGerente("");
-                  setMotivo("");
-                  setErro("");
-                  setTela("bloqueado");
-                }}
-                className={BOTAO_SECUNDARIO}
+              <form
+                onSubmit={liberarIngresso}
+                className="space-y-4"
               >
-                <ArrowLeft size={17} />
-                Cancelar
-              </button>
-            </form>
-          </div>
-        )}
+                <div>
+                  <label
+                    htmlFor="motivo"
+                    className="mb-2 block text-xs font-semibold text-white/80"
+                  >
+                    Motivo da liberação
+                  </label>
+
+                  <textarea
+                    id="motivo"
+                    value={motivo}
+                    onChange={(e) =>
+                      setMotivo(e.target.value)
+                    }
+                    required
+                    minLength={5}
+                    maxLength={500}
+                    rows={3}
+                    placeholder="Ex.: Substituição de participante"
+                    className={`${CAMPO} h-auto min-h-[100px] resize-none py-3`}
+                  />
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="pinGerente"
+                    className="mb-2 block text-xs font-semibold text-white/80"
+                  >
+                    PIN especial do gerente
+                  </label>
+
+                  <div className="relative">
+                    <LockKeyhole
+                      size={18}
+                      className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-white/40"
+                    />
+
+                    <input
+                      id="pinGerente"
+                      type={
+                        mostrarPin
+                          ? "text"
+                          : "password"
+                      }
+                      inputMode="numeric"
+                      autoComplete="off"
+                      value={pinGerente}
+                      onChange={(e) =>
+                        setPinGerente(
+                          e.target.value
+                            .replace(/\D/g, "")
+                            .slice(0, 8)
+                        )
+                      }
+                      required
+                      minLength={8}
+                      maxLength={8}
+                      placeholder="8 dígitos"
+                      className={`${CAMPO} pl-11 pr-12`}
+                    />
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setMostrarPin(!mostrarPin)
+                      }
+                      aria-label={
+                        mostrarPin
+                          ? "Ocultar PIN"
+                          : "Mostrar PIN"
+                      }
+                      className="absolute right-2 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center text-white/60"
+                    >
+                      {mostrarPin ? (
+                        <EyeOff size={19} />
+                      ) : (
+                        <Eye size={19} />
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={
+                    carregando ||
+                    Boolean(
+                      bloqueadoAte &&
+                        new Date(bloqueadoAte) >
+                          new Date()
+                    ) ||
+                    motivo.trim().length < 5 ||
+                    pinGerente.length !== 8
+                  }
+                  className={BOTAO_DOURADO}
+                >
+                  {carregando ? (
+                    <Loader2
+                      size={19}
+                      className="animate-spin"
+                    />
+                  ) : (
+                    <UnlockKeyhole size={19} />
+                  )}
+
+                  Autorizar liberação
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPinGerente("");
+                    setMotivo("");
+                    setErro("");
+                    setTela("bloqueado");
+                  }}
+                  className={BOTAO_SECUNDARIO}
+                >
+                  <ArrowLeft size={17} />
+                  Cancelar
+                </button>
+              </form>
+            </div>
+          )}
       </div>
     </main>
   );

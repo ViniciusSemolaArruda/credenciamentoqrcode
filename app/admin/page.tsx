@@ -24,6 +24,17 @@ type PageProps = {
   }>;
 };
 
+type EntradaPainel = {
+  id: string;
+  tipo: "ESCOLA" | "INDIVIDUAL";
+  local: string;
+  codigo: string;
+  nome: string;
+  sobrenome: string;
+  horario: Date;
+  funcionarioNumero: number | null;
+};
+
 // ==========================================
 // CALCULAR INÍCIO DO PERÍODO
 // ==========================================
@@ -85,6 +96,14 @@ function formatarData(data: Date) {
   }).format(data);
 }
 
+function nomeCategoria(
+  categoria: "PRESIDENCIA" | "PISTA"
+) {
+  return categoria === "PRESIDENCIA"
+    ? "Presidência"
+    : "Pista";
+}
+
 // ==========================================
 // CONTEÚDO DO PAINEL
 // ==========================================
@@ -94,19 +113,21 @@ async function PainelConteudo({
 }: {
   periodo: Periodo;
 }) {
-  // Aguarda uma requisição real antes de calcular
-  // a data atual. Compatível com Next.js 16
-  // e cacheComponents habilitado.
+  // Compatível com Next.js 16 e cacheComponents.
   await connection();
 
   const inicio = obterInicioPeriodo(periodo);
 
   const [
-    totalEntradas,
+    entradasEscolas,
+    entradasIndividuais,
     totalLiberacoes,
-    totalCancelados,
-    ultimasEntradas,
+    canceladosEscolas,
+    canceladosIndividuais,
+    ultimasEntradasEscolas,
+    ultimasEntradasIndividuais,
   ] = await Promise.all([
+    // Entradas das escolas de samba.
     prisma.entrada.count({
       where: {
         horario: {
@@ -115,6 +136,16 @@ async function PainelConteudo({
       },
     }),
 
+    // Entradas de Presidência e Pista.
+    prisma.entradaConvidado.count({
+      where: {
+        horario: {
+          gte: inicio,
+        },
+      },
+    }),
+
+    // Liberações gerenciais das escolas.
     prisma.liberacaoIngresso.count({
       where: {
         autorizadoEm: {
@@ -123,14 +154,21 @@ async function PainelConteudo({
       },
     }),
 
-    // O schema atual não possui data de
-    // cancelamento. Este é o total atual.
+    // Cancelamentos atuais das escolas.
     prisma.ingresso.count({
       where: {
         status: "CANCELADO",
       },
     }),
 
+    // Cancelamentos atuais dos individuais.
+    prisma.ingressoConvidado.count({
+      where: {
+        status: "CANCELADO",
+      },
+    }),
+
+    // Últimas entradas das escolas.
     prisma.entrada.findMany({
       where: {
         horario: {
@@ -141,9 +179,15 @@ async function PainelConteudo({
         horario: "desc",
       },
       take: 8,
-      include: {
+      select: {
+        id: true,
+        nome: true,
+        sobrenome: true,
+        horario: true,
+        funcionarioNumero: true,
         ingresso: {
-          include: {
+          select: {
+            codigo: true,
             escola: {
               select: {
                 nome: true,
@@ -153,7 +197,83 @@ async function PainelConteudo({
         },
       },
     }),
+
+    // Últimas entradas individuais.
+    prisma.entradaConvidado.findMany({
+      where: {
+        horario: {
+          gte: inicio,
+        },
+      },
+      orderBy: {
+        horario: "desc",
+      },
+      take: 8,
+      select: {
+        id: true,
+        nome: true,
+        sobrenome: true,
+        horario: true,
+        funcionarioNumero: true,
+        ingressoConvidado: {
+          select: {
+            codigo: true,
+            categoria: true,
+          },
+        },
+      },
+    }),
   ]);
+
+  // ==========================================
+  // ESTATÍSTICAS UNIFICADAS
+  // ==========================================
+
+  const totalEntradas =
+    entradasEscolas + entradasIndividuais;
+
+  const totalCancelados =
+    canceladosEscolas + canceladosIndividuais;
+
+  // ==========================================
+  // UNIFICAR ÚLTIMAS ENTRADAS
+  // ==========================================
+
+  const entradasDasEscolas: EntradaPainel[] =
+    ultimasEntradasEscolas.map((entrada) => ({
+      id: entrada.id,
+      tipo: "ESCOLA",
+      local: entrada.ingresso.escola.nome,
+      codigo: entrada.ingresso.codigo,
+      nome: entrada.nome,
+      sobrenome: entrada.sobrenome,
+      horario: entrada.horario,
+      funcionarioNumero: entrada.funcionarioNumero,
+    }));
+
+  const entradasDeConvidados: EntradaPainel[] =
+    ultimasEntradasIndividuais.map((entrada) => ({
+      id: entrada.id,
+      tipo: "INDIVIDUAL",
+      local: nomeCategoria(
+        entrada.ingressoConvidado.categoria
+      ),
+      codigo: entrada.ingressoConvidado.codigo,
+      nome: entrada.nome,
+      sobrenome: entrada.sobrenome,
+      horario: entrada.horario,
+      funcionarioNumero: entrada.funcionarioNumero,
+    }));
+
+  const ultimasEntradas: EntradaPainel[] = [
+    ...entradasDasEscolas,
+    ...entradasDeConvidados,
+  ]
+    .sort(
+      (a, b) =>
+        b.horario.getTime() - a.horario.getTime()
+    )
+    .slice(0, 8);
 
   const filtros: {
     valor: Periodo;
@@ -169,6 +289,7 @@ async function PainelConteudo({
       <AutoRefresh intervalo={5000} />
 
       {/* EFEITO DE FUNDO */}
+
       <div className="pointer-events-none absolute inset-x-0 top-0 h-80 bg-[radial-gradient(ellipse_at_top,rgba(33,54,61,0.35),transparent_70%)]" />
 
       <div className="relative mx-auto w-full max-w-lg px-4 pb-8 pt-5">
@@ -219,7 +340,9 @@ async function PainelConteudo({
                     ? "/admin"
                     : `/admin?periodo=${filtro.valor}`
                 }
-                aria-current={ativo ? "page" : undefined}
+                aria-current={
+                  ativo ? "page" : undefined
+                }
                 className={`flex h-10 items-center justify-center rounded-lg text-xs font-semibold transition ${
                   ativo
                     ? "bg-gradient-to-b from-[#FFE08A] to-[#DCA53D] text-[#231A0A] shadow-md"
@@ -233,7 +356,7 @@ async function PainelConteudo({
         </div>
 
         {/* ======================================
-            NOVO: VERIFICADOR DE QR CODE
+            VERIFICADOR DE QR CODE
         ====================================== */}
 
         <Link
@@ -369,10 +492,16 @@ async function PainelConteudo({
             <div className="space-y-2">
               {ultimasEntradas.map((entrada) => (
                 <div
-                  key={entrada.id}
+                  key={`${entrada.tipo}-${entrada.id}`}
                   className="flex min-h-[69px] items-center gap-3 rounded-xl border border-white/[0.08] bg-[#141D25] px-3 py-2.5"
                 >
-                  <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-[#2DD778] shadow-[0_0_12px_rgba(45,215,120,0.45)]" />
+                  <span
+                    className={`h-2.5 w-2.5 shrink-0 rounded-full ${
+                      entrada.tipo === "INDIVIDUAL"
+                        ? "bg-[#F4C75D] shadow-[0_0_12px_rgba(244,199,93,0.3)]"
+                        : "bg-[#2DD778] shadow-[0_0_12px_rgba(45,215,120,0.45)]"
+                    }`}
+                  />
 
                   <div className="w-[43px] shrink-0">
                     <p className="text-[11px] font-semibold text-white/80">
@@ -386,12 +515,18 @@ async function PainelConteudo({
 
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-xs font-semibold">
-                      {entrada.ingresso.escola.nome}
+                      {entrada.local}
                     </p>
 
                     <p className="mt-1 truncate text-[11px] text-white/45">
                       {entrada.nome} {entrada.sobrenome}
                     </p>
+
+                    {entrada.tipo === "INDIVIDUAL" && (
+                      <p className="mt-1 truncate text-[10px] font-medium text-[#F4C75D]/80">
+                        Ingresso individual
+                      </p>
+                    )}
                   </div>
 
                   <span className="shrink-0 text-[10px] text-white/45">

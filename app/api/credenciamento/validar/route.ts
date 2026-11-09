@@ -1,3 +1,4 @@
+
 import { NextRequest, NextResponse } from "next/server";
 
 import { prisma } from "@/lib/prisma";
@@ -104,7 +105,7 @@ export async function POST(request: NextRequest) {
     }
 
     // ======================================
-    // 5. BUSCAR INGRESSO NO POSTGRESQL
+    // 5. BUSCAR INGRESSO DE ESCOLA
     // ======================================
 
     const ingresso = await prisma.ingresso.findUnique({
@@ -136,7 +137,74 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    if (!ingresso) {
+    // ======================================
+    // 6. SE FOR INGRESSO DE ESCOLA
+    // ======================================
+
+    if (ingresso) {
+      const ultimaEntrada =
+        ingresso.status === "UTILIZADO"
+          ? ingresso.entradas[0] ?? null
+          : null;
+
+      return NextResponse.json(
+        {
+          sucesso: true,
+          tipo: "ESCOLA",
+          status: ingresso.status,
+          ingresso: {
+            id: ingresso.id,
+            codigo: ingresso.codigo,
+            status: ingresso.status,
+            tipo: "ESCOLA",
+            categoria: null,
+            escola: {
+              nome: ingresso.escola.nome,
+            },
+            ultimaEntrada: ultimaEntrada
+              ? {
+                  nome: ultimaEntrada.nome,
+                  sobrenome: ultimaEntrada.sobrenome,
+                  horario:
+                    ultimaEntrada.horario.toISOString(),
+                }
+              : null,
+          },
+        },
+        {
+          headers: {
+            "Cache-Control": "no-store",
+          },
+        }
+      );
+    }
+
+    // ======================================
+    // 7. BUSCAR INGRESSO INDIVIDUAL
+    // ======================================
+
+    const ingressoIndividual =
+      await prisma.ingressoConvidado.findUnique({
+        where: {
+          qrToken,
+        },
+        select: {
+          id: true,
+          codigo: true,
+          numero: true,
+          categoria: true,
+          status: true,
+          entrada: {
+            select: {
+              nome: true,
+              sobrenome: true,
+              horario: true,
+            },
+          },
+        },
+      });
+
+    if (!ingressoIndividual) {
       return respostaErro(
         "Ingresso não encontrado.",
         404
@@ -144,34 +212,47 @@ export async function POST(request: NextRequest) {
     }
 
     // ======================================
-    // 6. IDENTIFICAR ÚLTIMO PARTICIPANTE
+    // 8. IDENTIFICAR CATEGORIA
     // ======================================
 
-    const ultimaEntrada =
-      ingresso.status === "UTILIZADO"
-        ? ingresso.entradas[0] ?? null
+    const nomeCategoria =
+      ingressoIndividual.categoria === "PRESIDENCIA"
+        ? "Presidência"
+        : "Pista";
+
+    const ultimaEntradaIndividual =
+      ingressoIndividual.status === "UTILIZADO"
+        ? ingressoIndividual.entrada
         : null;
 
     // ======================================
-    // 7. RETORNAR RESULTADO
+    // 9. RETORNAR INGRESSO INDIVIDUAL
     // ======================================
 
     return NextResponse.json(
       {
         sucesso: true,
-        status: ingresso.status,
+        tipo: "INDIVIDUAL",
+        status: ingressoIndividual.status,
         ingresso: {
-          id: ingresso.id,
-          codigo: ingresso.codigo,
-          status: ingresso.status,
+          id: ingressoIndividual.id,
+          codigo: ingressoIndividual.codigo,
+          numero: ingressoIndividual.numero,
+          status: ingressoIndividual.status,
+          tipo: "INDIVIDUAL",
+          categoria: ingressoIndividual.categoria,
+          nomeCategoria,
           escola: {
-            nome: ingresso.escola.nome,
+            nome: nomeCategoria,
           },
-          ultimaEntrada: ultimaEntrada
+          permiteAcompanhantes: false,
+          ultimaEntrada: ultimaEntradaIndividual
             ? {
-                nome: ultimaEntrada.nome,
-                sobrenome: ultimaEntrada.sobrenome,
-                horario: ultimaEntrada.horario.toISOString(),
+                nome: ultimaEntradaIndividual.nome,
+                sobrenome:
+                  ultimaEntradaIndividual.sobrenome,
+                horario:
+                  ultimaEntradaIndividual.horario.toISOString(),
               }
             : null,
         },

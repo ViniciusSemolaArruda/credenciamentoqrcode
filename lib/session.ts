@@ -1,9 +1,13 @@
 
 import "server-only";
+
 import { cookies } from "next/headers";
 import { SignJWT, jwtVerify } from "jose";
 
 const COOKIE_NAME = "credenciamento_session";
+
+// Duração da sessão: 7 dias.
+const SESSION_DURATION_SECONDS = 60 * 60 * 24 * 7;
 
 function getSecret() {
   const secret = process.env.SESSION_SECRET;
@@ -23,6 +27,10 @@ export type SessionUser = {
   role: "ADMIN" | "FUNCIONARIO";
 };
 
+// ==========================================
+// CRIAR SESSÃO
+// ==========================================
+
 export async function createSession(user: SessionUser) {
   const token = await new SignJWT({
     nome: user.nome,
@@ -31,7 +39,7 @@ export async function createSession(user: SessionUser) {
     .setProtectedHeader({ alg: "HS256" })
     .setSubject(user.id)
     .setIssuedAt()
-    .setExpirationTime("12h")
+    .setExpirationTime("7d")
     .sign(getSecret());
 
   const cookieStore = await cookies();
@@ -41,9 +49,13 @@ export async function createSession(user: SessionUser) {
     secure: process.env.NODE_ENV === "production",
     sameSite: "strict",
     path: "/",
-    maxAge: 60 * 60 * 12,
+    maxAge: SESSION_DURATION_SECONDS,
   });
 }
+
+// ==========================================
+// VERIFICAR SESSÃO
+// ==========================================
 
 export async function getSession(): Promise<SessionUser | null> {
   const cookieStore = await cookies();
@@ -54,7 +66,13 @@ export async function getSession(): Promise<SessionUser | null> {
   }
 
   try {
-    const { payload } = await jwtVerify(token, getSecret());
+    const { payload } = await jwtVerify(
+      token,
+      getSecret(),
+      {
+        algorithms: ["HS256"],
+      }
+    );
 
     if (
       typeof payload.sub !== "string" ||
@@ -75,7 +93,12 @@ export async function getSession(): Promise<SessionUser | null> {
   }
 }
 
+// ==========================================
+// ENCERRAR SESSÃO
+// ==========================================
+
 export async function deleteSession() {
   const cookieStore = await cookies();
+
   cookieStore.delete(COOKIE_NAME);
 }

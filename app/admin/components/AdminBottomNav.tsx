@@ -9,6 +9,7 @@ import {
   History,
   School,
   Ticket,
+  Newspaper,
   Menu,
 } from "lucide-react";
 
@@ -38,6 +39,11 @@ const itens = [
     icone: Ticket,
   },
   {
+    nome: "Imprensa",
+    href: "/admin/imprensa",
+    icone: Newspaper,
+  },
+  {
     nome: "Mais",
     href: "/admin/mais",
     icone: Menu,
@@ -56,11 +62,10 @@ export default function AdminBottomNav() {
       aria-label="Menu administrativo"
       className="fixed inset-x-0 bottom-0 z-50 border-t border-white/10 bg-[#0C141B]/95 shadow-[0_-12px_40px_rgba(0,0,0,0.35)] backdrop-blur-2xl"
       style={{
-        paddingBottom:
-          "env(safe-area-inset-bottom, 0px)",
+        paddingBottom: "env(safe-area-inset-bottom, 0px)",
       }}
     >
-      <div className="mx-auto grid h-[68px] max-w-lg grid-cols-5">
+      <div className="mx-auto grid h-[68px] max-w-lg grid-cols-6">
         {itens.map((item) => {
           const ativo =
             item.href === "/admin"
@@ -88,11 +93,11 @@ export default function AdminBottomNav() {
               )}
 
               <Icone
-                size={21}
+                size={20}
                 strokeWidth={ativo ? 2.5 : 1.8}
               />
 
-              <span className="text-[10px] font-semibold">
+              <span className="text-[9px] font-semibold">
                 {item.nome}
               </span>
             </Link>

@@ -26,7 +26,7 @@ type PageProps = {
 
 type EntradaPainel = {
   id: string;
-  tipo: "ESCOLA" | "INDIVIDUAL";
+  tipo: "ESCOLA" | "INDIVIDUAL" | "IMPRENSA";
   local: string;
   codigo: string;
   nome: string;
@@ -121,11 +121,14 @@ async function PainelConteudo({
   const [
     entradasEscolas,
     entradasIndividuais,
+    entradasImprensa,
     totalLiberacoes,
     canceladosEscolas,
     canceladosIndividuais,
+    canceladosImprensa,
     ultimasEntradasEscolas,
     ultimasEntradasIndividuais,
+    ultimasEntradasImprensa,
   ] = await Promise.all([
     // Entradas das escolas de samba.
     prisma.entrada.count({
@@ -138,6 +141,15 @@ async function PainelConteudo({
 
     // Entradas de Presidência e Pista.
     prisma.entradaConvidado.count({
+      where: {
+        horario: {
+          gte: inicio,
+        },
+      },
+    }),
+
+    // Entradas da imprensa.
+    prisma.entradaImprensa.count({
       where: {
         horario: {
           gte: inicio,
@@ -163,6 +175,13 @@ async function PainelConteudo({
 
     // Cancelamentos atuais dos individuais.
     prisma.ingressoConvidado.count({
+      where: {
+        status: "CANCELADO",
+      },
+    }),
+
+    // Cancelamentos atuais da imprensa.
+    prisma.ingressoImprensa.count({
       where: {
         status: "CANCELADO",
       },
@@ -223,6 +242,36 @@ async function PainelConteudo({
         },
       },
     }),
+
+    // Últimas entradas da imprensa.
+    prisma.entradaImprensa.findMany({
+      where: {
+        horario: {
+          gte: inicio,
+        },
+      },
+      orderBy: {
+        horario: "desc",
+      },
+      take: 8,
+      select: {
+        id: true,
+        nome: true,
+        sobrenome: true,
+        horario: true,
+        funcionarioNumero: true,
+        ingressoImprensa: {
+          select: {
+            codigo: true,
+            veiculo: {
+              select: {
+                nome: true,
+              },
+            },
+          },
+        },
+      },
+    }),
   ]);
 
   // ==========================================
@@ -230,10 +279,14 @@ async function PainelConteudo({
   // ==========================================
 
   const totalEntradas =
-    entradasEscolas + entradasIndividuais;
+    entradasEscolas +
+    entradasIndividuais +
+    entradasImprensa;
 
   const totalCancelados =
-    canceladosEscolas + canceladosIndividuais;
+    canceladosEscolas +
+    canceladosIndividuais +
+    canceladosImprensa;
 
   // ==========================================
   // UNIFICAR ÚLTIMAS ENTRADAS
@@ -265,9 +318,22 @@ async function PainelConteudo({
       funcionarioNumero: entrada.funcionarioNumero,
     }));
 
+  const entradasDaImprensa: EntradaPainel[] =
+    ultimasEntradasImprensa.map((entrada) => ({
+      id: entrada.id,
+      tipo: "IMPRENSA",
+      local: entrada.ingressoImprensa.veiculo.nome,
+      codigo: entrada.ingressoImprensa.codigo,
+      nome: entrada.nome,
+      sobrenome: entrada.sobrenome,
+      horario: entrada.horario,
+      funcionarioNumero: entrada.funcionarioNumero,
+    }));
+
   const ultimasEntradas: EntradaPainel[] = [
     ...entradasDasEscolas,
     ...entradasDeConvidados,
+    ...entradasDaImprensa,
   ]
     .sort(
       (a, b) =>
@@ -497,9 +563,11 @@ async function PainelConteudo({
                 >
                   <span
                     className={`h-2.5 w-2.5 shrink-0 rounded-full ${
-                      entrada.tipo === "INDIVIDUAL"
-                        ? "bg-[#F4C75D] shadow-[0_0_12px_rgba(244,199,93,0.3)]"
-                        : "bg-[#2DD778] shadow-[0_0_12px_rgba(45,215,120,0.45)]"
+                      entrada.tipo === "IMPRENSA"
+                        ? "bg-sky-400 shadow-[0_0_12px_rgba(56,189,248,0.4)]"
+                        : entrada.tipo === "INDIVIDUAL"
+                          ? "bg-[#F4C75D] shadow-[0_0_12px_rgba(244,199,93,0.3)]"
+                          : "bg-[#2DD778] shadow-[0_0_12px_rgba(45,215,120,0.45)]"
                     }`}
                   />
 
@@ -525,6 +593,12 @@ async function PainelConteudo({
                     {entrada.tipo === "INDIVIDUAL" && (
                       <p className="mt-1 truncate text-[10px] font-medium text-[#F4C75D]/80">
                         Ingresso individual
+                      </p>
+                    )}
+
+                    {entrada.tipo === "IMPRENSA" && (
+                      <p className="mt-1 truncate text-[10px] font-medium text-sky-300/80">
+                        Imprensa
                       </p>
                     )}
                   </div>

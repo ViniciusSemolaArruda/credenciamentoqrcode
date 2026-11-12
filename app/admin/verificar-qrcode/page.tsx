@@ -16,6 +16,7 @@ import {
   Ticket,
   Users,
   Clock3,
+  Newspaper,
 } from "lucide-react";
 
 // ==========================================
@@ -29,12 +30,19 @@ type StatusIngresso =
 
 type CategoriaConvidado = "PRESIDENCIA" | "PISTA";
 
+type TipoIngresso =
+  | "ESCOLA"
+  | "CONVIDADO"
+  | "INDIVIDUAL"
+  | "IMPRENSA";
+
 type ResultadoVerificacao = {
   sucesso: boolean;
   reconhecido?: boolean;
   mensagem?: string;
-  tipo?: "ESCOLA" | "CONVIDADO";
-  categoria?: CategoriaConvidado;
+
+  tipo?: TipoIngresso;
+  categoria?: CategoriaConvidado | "IMPRENSA";
 
   ingresso?: {
     id: string;
@@ -42,11 +50,16 @@ type ResultadoVerificacao = {
     numero: number;
     status: StatusIngresso;
 
-    categoria?: CategoriaConvidado;
+    categoria?: CategoriaConvidado | "IMPRENSA";
 
     escola?: {
       nome: string;
       sigla?: string | null;
+    };
+
+    veiculo?: {
+      nome: string;
+      slug?: string;
     };
 
     ultimaEntrada?: {
@@ -131,6 +144,10 @@ function formatarCategoria(
     return "Escola de samba";
   }
 
+  if (resultado.tipo === "IMPRENSA") {
+    return "Imprensa";
+  }
+
   const categoria =
     resultado.ingresso?.categoria ?? resultado.categoria;
 
@@ -140,6 +157,10 @@ function formatarCategoria(
 
   if (categoria === "PISTA") {
     return "Pista";
+  }
+
+  if (categoria === "IMPRENSA") {
+    return "Imprensa";
   }
 
   return "Ingresso individual";
@@ -214,8 +235,10 @@ export default function VerificarQRCodePage() {
 
         await pararCamera();
 
-        setCameraAtiva(false);
-        setVerificando(false);
+        if (!desmontadoRef.current) {
+          setCameraAtiva(false);
+          setVerificando(false);
+        }
 
         return;
       }
@@ -223,7 +246,9 @@ export default function VerificarQRCodePage() {
       try {
         await pararCamera();
 
-        setCameraAtiva(false);
+        if (!desmontadoRef.current) {
+          setCameraAtiva(false);
+        }
 
         const resposta = await fetch(
           "/api/admin/verificar-qrcode",
@@ -243,19 +268,29 @@ export default function VerificarQRCodePage() {
           await resposta.json();
 
         if (!resposta.ok || !dados.sucesso) {
-          setErro(
-            dados.mensagem || "Erro ao verificar QR Code."
-          );
+          if (!desmontadoRef.current) {
+            setErro(
+              dados.mensagem ||
+                "Erro ao verificar QR Code."
+            );
+          }
+
           return;
         }
 
-        setResultado(dados);
+        if (!desmontadoRef.current) {
+          setResultado(dados);
+        }
       } catch (error) {
         console.error("Erro na verificação:", error);
 
-        setErro("Não foi possível consultar o QR Code.");
+        if (!desmontadoRef.current) {
+          setErro("Não foi possível consultar o QR Code.");
+        }
       } finally {
-        setVerificando(false);
+        if (!desmontadoRef.current) {
+          setVerificando(false);
+        }
       }
     },
     [pararCamera]
@@ -298,10 +333,9 @@ export default function VerificarQRCodePage() {
         {
           fps: 10,
           qrbox: (largura, altura) => {
-            const tamanho = Math.min(
-              largura,
-              altura,
-              250
+            const tamanho = Math.max(
+              100,
+              Math.min(largura, altura, 250)
             );
 
             return {
@@ -342,7 +376,10 @@ export default function VerificarQRCodePage() {
       }
 
       await pararCamera();
-      setCameraAtiva(false);
+
+      if (!desmontadoRef.current) {
+        setCameraAtiva(false);
+      }
     } finally {
       iniciandoRef.current = false;
 
@@ -391,7 +428,15 @@ export default function VerificarQRCodePage() {
     ? formatarCategoria(resultado)
     : "";
 
-  const ehConvidado = resultado?.tipo === "CONVIDADO";
+  const ehConvidado =
+    resultado?.tipo === "CONVIDADO" ||
+    resultado?.tipo === "INDIVIDUAL";
+
+  const ehImprensa = resultado?.tipo === "IMPRENSA";
+
+  const nomeVeiculo =
+    ingresso?.veiculo?.nome ??
+    (ehImprensa ? ingresso?.escola?.nome : undefined);
 
   // ==========================================
   // INTERFACE
@@ -618,7 +663,12 @@ export default function VerificarQRCodePage() {
                 {/* CATEGORIA */}
 
                 <div className="flex items-center gap-3">
-                  {ehConvidado ? (
+                  {ehImprensa ? (
+                    <Newspaper
+                      size={22}
+                      className="text-sky-400"
+                    />
+                  ) : ehConvidado ? (
                     <Users
                       size={22}
                       className="text-[#F4C75D]"
@@ -635,7 +685,13 @@ export default function VerificarQRCodePage() {
                       Categoria
                     </p>
 
-                    <p className="text-sm font-bold">
+                    <p
+                      className={`text-sm font-bold ${
+                        ehImprensa
+                          ? "text-sky-300"
+                          : "text-white"
+                      }`}
+                    >
                       {categoria}
                     </p>
                   </div>
@@ -643,7 +699,7 @@ export default function VerificarQRCodePage() {
 
                 {/* ESCOLA DE SAMBA */}
 
-                {ingresso.escola && (
+                {!ehImprensa && ingresso.escola && (
                   <div>
                     <p className="text-[11px] text-white/40">
                       Escola de samba
@@ -651,6 +707,27 @@ export default function VerificarQRCodePage() {
 
                     <p className="mt-1 text-sm font-semibold">
                       {ingresso.escola.nome}
+                    </p>
+                  </div>
+                )}
+
+                {/* VEÍCULO DE IMPRENSA */}
+
+                {ehImprensa && (
+                  <div className="rounded-xl border border-sky-400/15 bg-sky-400/[0.05] p-3">
+                    <div className="flex items-center gap-2">
+                      <Newspaper
+                        size={17}
+                        className="text-sky-400"
+                      />
+
+                      <p className="text-[11px] font-semibold text-sky-300">
+                        Veículo de imprensa
+                      </p>
+                    </div>
+
+                    <p className="mt-2 text-sm font-bold text-white">
+                      {nomeVeiculo ?? "Não informado"}
                     </p>
                   </div>
                 )}
@@ -701,6 +778,22 @@ export default function VerificarQRCodePage() {
                     {ingresso.codigo}
                   </p>
                 </div>
+
+                {/* INFORMAÇÃO SOBRE USO ÚNICO */}
+
+                {(ehImprensa || ehConvidado) && (
+                  <div className="rounded-xl border border-[#F4C75D]/15 bg-[#F4C75D]/[0.04] p-3">
+                    <p className="text-xs font-semibold text-[#F4C75D]">
+                      Ingresso de uso único
+                    </p>
+
+                    <p className="mt-1 text-xs leading-relaxed text-white/50">
+                      Válido para uma pessoa, sem acompanhantes.
+                      Após a confirmação da entrada, não pode
+                      ser utilizado novamente.
+                    </p>
+                  </div>
+                )}
 
                 {/* ==================================
                     ÚLTIMA ENTRADA REGISTRADA
@@ -753,7 +846,8 @@ export default function VerificarQRCodePage() {
 
         {(resultado || erro) &&
           !cameraAtiva &&
-          !carregandoCamera && (
+          !carregandoCamera &&
+          !verificando && (
             <button
               type="button"
               onClick={() => void novaLeitura()}

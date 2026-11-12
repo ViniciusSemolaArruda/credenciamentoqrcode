@@ -21,9 +21,11 @@ async function HistoricoContent() {
   const [
     entradas,
     entradasIndividuais,
+    entradasImprensa,
     liberacoes,
     ingressosUtilizadosEscolas,
     ingressosUtilizadosIndividuais,
+    ingressosUtilizadosImprensa,
   ] = await Promise.all([
     // Entradas das escolas de samba.
     prisma.entrada.findMany({
@@ -61,6 +63,31 @@ async function HistoricoContent() {
           select: {
             codigo: true,
             categoria: true,
+          },
+        },
+        usuario: {
+          select: {
+            nome: true,
+          },
+        },
+      },
+    }),
+
+    // Entradas dos veículos de imprensa.
+    prisma.entradaImprensa.findMany({
+      orderBy: [
+        { horario: "desc" },
+        { id: "desc" },
+      ],
+      include: {
+        ingressoImprensa: {
+          select: {
+            codigo: true,
+            veiculo: {
+              select: {
+                nome: true,
+              },
+            },
           },
         },
         usuario: {
@@ -109,6 +136,13 @@ async function HistoricoContent() {
         status: "UTILIZADO",
       },
     }),
+
+    // Ingressos da imprensa utilizados.
+    prisma.ingressoImprensa.count({
+      where: {
+        status: "UTILIZADO",
+      },
+    }),
   ]);
 
   // ==========================================
@@ -118,6 +152,7 @@ async function HistoricoContent() {
   const registrosEntradas = entradas.map((entrada) => ({
     id: entrada.id,
     tipo: "ENTRADA" as const,
+    categoriaIngresso: "ESCOLA" as const,
     nome: `${entrada.nome} ${entrada.sobrenome}`,
     escola: entrada.ingresso.escola.nome,
     codigo: entrada.ingresso.codigo,
@@ -135,12 +170,32 @@ async function HistoricoContent() {
     (entrada) => ({
       id: entrada.id,
       tipo: "ENTRADA" as const,
+      categoriaIngresso: "INDIVIDUAL" as const,
       nome: `${entrada.nome} ${entrada.sobrenome}`,
       escola:
         entrada.ingressoConvidado.categoria === "PRESIDENCIA"
           ? "Presidência"
           : "Pista",
       codigo: entrada.ingressoConvidado.codigo,
+      funcionarioNumero: entrada.funcionarioNumero,
+      data: entrada.horario.toISOString(),
+      motivo: null as string | null,
+      gerente: null as string | null,
+    })
+  );
+
+  // ==========================================
+  // ORGANIZAR ENTRADAS DA IMPRENSA
+  // ==========================================
+
+  const registrosImprensa = entradasImprensa.map(
+    (entrada) => ({
+      id: entrada.id,
+      tipo: "ENTRADA" as const,
+      categoriaIngresso: "IMPRENSA" as const,
+      nome: `${entrada.nome} ${entrada.sobrenome}`,
+      escola: entrada.ingressoImprensa.veiculo.nome,
+      codigo: entrada.ingressoImprensa.codigo,
       funcionarioNumero: entrada.funcionarioNumero,
       data: entrada.horario.toISOString(),
       motivo: null as string | null,
@@ -156,6 +211,7 @@ async function HistoricoContent() {
     (liberacao) => ({
       id: liberacao.id,
       tipo: "LIBERACAO" as const,
+      categoriaIngresso: "ESCOLA" as const,
       nome: "Liberação de ingresso",
       escola: liberacao.ingresso.escola.nome,
       codigo: liberacao.ingresso.codigo,
@@ -173,6 +229,7 @@ async function HistoricoContent() {
   const registros = [
     ...registrosEntradas,
     ...registrosIndividuais,
+    ...registrosImprensa,
     ...registrosLiberacoes,
   ].sort(
     (a, b) =>
@@ -185,13 +242,16 @@ async function HistoricoContent() {
   // ==========================================
 
   const totalEntradas =
-    entradas.length + entradasIndividuais.length;
+    entradas.length +
+    entradasIndividuais.length +
+    entradasImprensa.length;
 
   const totalLiberacoes = liberacoes.length;
 
   const ingressosUtilizados =
     ingressosUtilizadosEscolas +
-    ingressosUtilizadosIndividuais;
+    ingressosUtilizadosIndividuais +
+    ingressosUtilizadosImprensa;
 
   // ==========================================
   // RENDERIZAR PÁGINA

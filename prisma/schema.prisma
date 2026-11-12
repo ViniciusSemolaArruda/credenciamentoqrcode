@@ -45,6 +45,7 @@ model Usuario {
   entradas              Entrada[]
   liberacoesAutorizadas LiberacaoIngresso[] @relation("GerenteAutorizador")
   entradasConvidados    EntradaConvidado[]  @relation("EntradasConvidados")
+  entradasImprensa      EntradaImprensa[]   @relation("EntradasImprensa")
 }
 
 // ==========================================
@@ -257,6 +258,78 @@ model EntradaConvidado {
 
   usuarioId String
   usuario   Usuario @relation("EntradasConvidados", fields: [usuarioId], references: [id])
+
+  horario   DateTime @default(now())
+  createdAt DateTime @default(now())
+
+  @@index([usuarioId])
+  @@index([horario])
+  @@index([funcionarioNumero])
+}
+
+// ==========================================
+// VEÍCULOS DE IMPRENSA
+// ==========================================
+
+model VeiculoImprensa {
+  id   String @id @default(cuid())
+  nome String @unique
+  slug String @unique
+
+  ativo Boolean @default(true)
+
+  // Ingressos vinculados ao veículo.
+  ingressos IngressoImprensa[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ==========================================
+// INGRESSOS E QR CODES DA IMPRENSA
+// ==========================================
+
+model IngressoImprensa {
+  id      String         @id @default(cuid())
+  codigo  String         @unique
+  qrToken String         @unique
+  numero  Int
+  status  StatusIngresso @default(DISPONIVEL)
+
+  veiculoId String
+  veiculo   VeiculoImprensa @relation(fields: [veiculoId], references: [id], onDelete: Restrict)
+
+  // Cada QR Code permite apenas uma entrada.
+  entrada EntradaImprensa?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Numeração independente para cada veículo.
+  @@unique([veiculoId, numero])
+  @@index([veiculoId, status])
+}
+
+// ==========================================
+// REGISTROS DE ENTRADA DA IMPRENSA
+// ==========================================
+
+model EntradaImprensa {
+  id String @id @default(cuid())
+
+  // Impede múltiplas entradas para o mesmo QR Code.
+  ingressoImprensaId String           @unique
+  ingressoImprensa   IngressoImprensa @relation(fields: [ingressoImprensaId], references: [id], onDelete: Restrict)
+
+  // Dados do profissional de imprensa.
+  nome      String
+  sobrenome String
+
+  // Funcionário 1, 2 ou 3.
+  funcionarioNumero Int
+
+  usuarioId String
+  usuario   Usuario @relation("EntradasImprensa", fields: [usuarioId], references: [id])
 
   horario   DateTime @default(now())
   createdAt DateTime @default(now())

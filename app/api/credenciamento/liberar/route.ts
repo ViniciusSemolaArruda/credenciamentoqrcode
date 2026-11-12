@@ -5,7 +5,50 @@ import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/session";
 import { verificarPinGerente } from "@/lib/seguranca-pin";
 
+export const dynamic = "force-dynamic";
+
+// ==========================================
+// ERRO DE CONCORRÊNCIA
+// ==========================================
+
 class IngressoNaoUtilizadoError extends Error {}
+
+// ==========================================
+// RESPOSTAS PADRONIZADAS
+// ==========================================
+
+const headers = {
+  "Cache-Control": "no-store",
+};
+
+function respostaErro(mensagem: string, status: number) {
+  return NextResponse.json(
+    {
+      sucesso: false,
+      mensagem,
+    },
+    {
+      status,
+      headers,
+    }
+  );
+}
+
+function respostaSucesso(dados: object) {
+  return NextResponse.json(
+    {
+      sucesso: true,
+      ...dados,
+    },
+    {
+      headers,
+    }
+  );
+}
+
+// ==========================================
+// LIBERAÇÃO GERENCIAL
+// ==========================================
 
 export async function POST(request: NextRequest) {
   try {
@@ -16,44 +59,33 @@ export async function POST(request: NextRequest) {
     const session = await getSession();
 
     if (!session) {
-      return NextResponse.json(
-        {
-          sucesso: false,
-          mensagem: "Faça login novamente.",
-        },
-        { status: 401 }
+      return respostaErro(
+        "Faça login novamente.",
+        401
       );
     }
 
     if (session.role !== "FUNCIONARIO") {
-      return NextResponse.json(
-        {
-          sucesso: false,
-          mensagem:
-            "Operação disponível apenas no credenciamento.",
-        },
-        { status: 403 }
+      return respostaErro(
+        "Operação disponível apenas no credenciamento.",
+        403
       );
     }
 
     const usuario = await prisma.usuario.findUnique({
-      where: { id: session.id },
+      where: {
+        id: session.id,
+      },
       select: {
         ativo: true,
         role: true,
       },
     });
 
-    if (
-      !usuario?.ativo ||
-      usuario.role !== "FUNCIONARIO"
-    ) {
-      return NextResponse.json(
-        {
-          sucesso: false,
-          mensagem: "Acesso não autorizado.",
-        },
-        { status: 403 }
+    if (!usuario?.ativo || usuario.role !== "FUNCIONARIO") {
+      return respostaErro(
+        "Acesso não autorizado.",
+        403
       );
     }
 
@@ -63,13 +95,14 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json().catch(() => null);
 
-    if (!body || typeof body !== "object") {
-      return NextResponse.json(
-        {
-          sucesso: false,
-          mensagem: "Dados inválidos.",
-        },
-        { status: 400 }
+    if (
+      !body ||
+      typeof body !== "object" ||
+      Array.isArray(body)
+    ) {
+      return respostaErro(
+        "Dados inválidos.",
+        400
       );
     }
 
@@ -84,12 +117,9 @@ export async function POST(request: NextRequest) {
       typeof qrToken !== "string" ||
       !/^[a-f0-9]{64}$/i.test(qrToken)
     ) {
-      return NextResponse.json(
-        {
-          sucesso: false,
-          mensagem: "QR Code inválido.",
-        },
-        { status: 400 }
+      return respostaErro(
+        "QR Code inválido.",
+        400
       );
     }
 
@@ -97,12 +127,9 @@ export async function POST(request: NextRequest) {
       !Number.isInteger(funcionarioNumero) ||
       ![1, 2, 3].includes(funcionarioNumero)
     ) {
-      return NextResponse.json(
-        {
-          sucesso: false,
-          mensagem: "Funcionário inválido.",
-        },
-        { status: 400 }
+      return respostaErro(
+        "Funcionário inválido.",
+        400
       );
     }
 
@@ -111,13 +138,9 @@ export async function POST(request: NextRequest) {
       motivo.trim().length < 5 ||
       motivo.trim().length > 500
     ) {
-      return NextResponse.json(
-        {
-          sucesso: false,
-          mensagem:
-            "Informe um motivo de 5 a 500 caracteres.",
-        },
-        { status: 400 }
+      return respostaErro(
+        "Informe um motivo de 5 a 500 caracteres.",
+        400
       );
     }
 
@@ -130,13 +153,9 @@ export async function POST(request: NextRequest) {
         "GERENTE_PIN_HASH não configurado."
       );
 
-      return NextResponse.json(
-        {
-          sucesso: false,
-          mensagem:
-            "Autorização gerencial indisponível.",
-        },
-        { status: 503 }
+      return respostaErro(
+        "Autorização gerencial indisponível.",
+        503
       );
     }
 
@@ -160,21 +179,26 @@ export async function POST(request: NextRequest) {
       !gerente.ativo ||
       gerente.role !== "ADMIN"
     ) {
-      return NextResponse.json(
-        {
-          sucesso: false,
-          mensagem: "Gerente não autorizado.",
-        },
-        { status: 403 }
+      return respostaErro(
+        "Gerente não autorizado.",
+        403
       );
     }
 
     // ======================================
-    // 5. LOCALIZAR INGRESSO
+    // 5. LOCALIZAR INGRESSO DE ESCOLA
     // ======================================
 
+    // Esta consulta é intencionalmente feita
+    // apenas no modelo "ingresso".
+    //
+    // Não consultar ingressoConvidado nem
+    // ingressoImprensa nesta operação.
+
     const ingresso = await prisma.ingresso.findUnique({
-      where: { qrToken },
+      where: {
+        qrToken,
+      },
       select: {
         id: true,
         status: true,
@@ -182,23 +206,16 @@ export async function POST(request: NextRequest) {
     });
 
     if (!ingresso) {
-      return NextResponse.json(
-        {
-          sucesso: false,
-          mensagem: "Ingresso não encontrado.",
-        },
-        { status: 404 }
+      return respostaErro(
+        "Ingresso não encontrado ou não elegível para liberação gerencial.",
+        404
       );
     }
 
     if (ingresso.status !== "UTILIZADO") {
-      return NextResponse.json(
-        {
-          sucesso: false,
-          mensagem:
-            "Somente ingressos utilizados podem ser liberados.",
-        },
-        { status: 409 }
+      return respostaErro(
+        "Somente ingressos utilizados podem ser liberados.",
+        409
       );
     }
 
@@ -227,7 +244,10 @@ export async function POST(request: NextRequest) {
           bloqueadoAte: resultadoPin.bloqueadoAte,
           tentativasRestantes: 0,
         },
-        { status: 429 }
+        {
+          status: 429,
+          headers,
+        }
       );
     }
 
@@ -240,17 +260,21 @@ export async function POST(request: NextRequest) {
           tentativasRestantes:
             resultadoPin.tentativasRestantes,
         },
-        { status: 403 }
+        {
+          status: 403,
+          headers,
+        }
       );
     }
 
     // ======================================
-    // 7. LIBERAR INGRESSO E REGISTRAR HISTÓRICO
+    // 7. LIBERAR INGRESSO
     // ======================================
 
     const liberacao = await prisma.$transaction(
       async (tx) => {
         // Impedir duas liberações simultâneas.
+
         const resultado = await tx.ingresso.updateMany({
           where: {
             id: ingresso.id,
@@ -265,6 +289,8 @@ export async function POST(request: NextRequest) {
           throw new IngressoNaoUtilizadoError();
         }
 
+        // Localizar última entrada da escola.
+
         const entradaAnterior = await tx.entrada.findFirst({
           where: {
             ingressoId: ingresso.id,
@@ -277,6 +303,8 @@ export async function POST(request: NextRequest) {
             id: true,
           },
         });
+
+        // Registrar a autorização no histórico.
 
         return tx.liberacaoIngresso.create({
           data: {
@@ -292,11 +320,10 @@ export async function POST(request: NextRequest) {
     );
 
     // ======================================
-    // 8. RESPOSTA DE SUCESSO
+    // 8. RETORNAR SUCESSO
     // ======================================
 
-    return NextResponse.json({
-      sucesso: true,
+    return respostaSucesso({
       mensagem: "INGRESSO LIBERADO COM SUCESSO!",
       liberacao: {
         id: liberacao.id,
@@ -307,28 +334,17 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     if (error instanceof IngressoNaoUtilizadoError) {
-      return NextResponse.json(
-        {
-          sucesso: false,
-          mensagem:
-            "Este ingresso já foi liberado.",
-        },
-        { status: 409 }
+      return respostaErro(
+        "Este ingresso já foi liberado.",
+        409
       );
     }
 
-    console.error(
-      "Erro ao liberar ingresso:",
-      error
-    );
+    console.error("Erro ao liberar ingresso:", error);
 
-    return NextResponse.json(
-      {
-        sucesso: false,
-        mensagem:
-          "Erro interno ao liberar ingresso.",
-      },
-      { status: 500 }
+    return respostaErro(
+      "Erro interno ao liberar ingresso.",
+      500
     );
   }
 }

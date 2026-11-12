@@ -1,6 +1,4 @@
-
 /* eslint-disable react-hooks/set-state-in-effect */
-
 "use client";
 
 import {
@@ -50,17 +48,14 @@ type Ingresso = {
   id: string;
   codigo: string;
   status: string;
-
-  tipo?: "ESCOLA" | "INDIVIDUAL";
-  categoria?: "PRESIDENCIA" | "PISTA" | null;
+  tipo?: "ESCOLA" | "INDIVIDUAL" | "IMPRENSA";
+  categoria?: "PRESIDENCIA" | "PISTA" | "IMPRENSA" | null;
   numero?: number;
   nomeCategoria?: string;
   permiteAcompanhantes?: boolean;
-
   escola: {
     nome: string;
   };
-
   ultimaEntrada?: UltimaEntrada | null;
 };
 
@@ -89,8 +84,11 @@ const CAMPO =
 // IDENTIFICAÇÃO DO INGRESSO
 // ==========================================
 
-function ehIndividual(ingresso: Ingresso | null) {
-  return ingresso?.tipo === "INDIVIDUAL";
+function ehUsoUnico(ingresso: Ingresso | null) {
+  return (
+    ingresso?.tipo === "INDIVIDUAL" ||
+    ingresso?.tipo === "IMPRENSA"
+  );
 }
 
 function nomeDoIngresso(ingresso: Ingresso) {
@@ -98,6 +96,10 @@ function nomeDoIngresso(ingresso: Ingresso) {
     return ingresso.categoria === "PRESIDENCIA"
       ? "Presidência"
       : "Pista";
+  }
+
+  if (ingresso.tipo === "IMPRENSA") {
+    return ingresso.nomeCategoria || ingresso.escola.nome;
   }
 
   return ingresso.escola.nome;
@@ -114,7 +116,8 @@ function CartaoIngresso({
   ingresso: Ingresso;
   vermelho?: boolean;
 }) {
-  const individual = ehIndividual(ingresso);
+  const imprensa = ingresso.tipo === "IMPRENSA";
+  const usoUnico = ehUsoUnico(ingresso);
 
   return (
     <div
@@ -125,8 +128,11 @@ function CartaoIngresso({
       }`}
     >
       <div className="relative flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-white/15 bg-white/10 p-1">
-        {individual ? (
-          <Ticket size={25} className="text-[#F4C75D]" />
+        {usoUnico ? (
+          <Ticket
+            size={25}
+            className="text-[#F4C75D]"
+          />
         ) : (
           <Image
             src="/logonova.png"
@@ -139,9 +145,11 @@ function CartaoIngresso({
       </div>
 
       <div className="min-w-0 flex-1">
-        {individual && (
+        {usoUnico && (
           <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-[#F4C75D]">
-            Ingresso individual
+            {imprensa
+              ? "Ingresso imprensa"
+              : "Ingresso individual"}
           </p>
         )}
 
@@ -153,7 +161,7 @@ function CartaoIngresso({
           {ingresso.codigo}
         </p>
 
-        {individual && (
+        {usoUnico && (
           <p className="mt-1 text-[11px] text-white/50">
             1 entrada · Sem acompanhantes
           </p>
@@ -227,8 +235,11 @@ function MolduraScanner({
       className="pointer-events-none absolute inset-0"
     >
       <span className="absolute left-0 top-0 h-9 w-9 rounded-tl-2xl border-l-[3px] border-t-[3px] border-[#F7CF67]" />
+
       <span className="absolute right-0 top-0 h-9 w-9 rounded-tr-2xl border-r-[3px] border-t-[3px] border-[#F7CF67]" />
+
       <span className="absolute bottom-0 left-0 h-9 w-9 rounded-bl-2xl border-b-[3px] border-l-[3px] border-[#F7CF67]" />
+
       <span className="absolute bottom-0 right-0 h-9 w-9 rounded-br-2xl border-b-[3px] border-r-[3px] border-[#F7CF67]" />
 
       {ativa && (
@@ -710,9 +721,9 @@ export default function CredenciamentoClient() {
     if (enviandoRef.current) return;
 
     // Proteção adicional na interface.
-    if (ehIndividual(ingresso)) {
+    if (!ingresso || ingresso.tipo !== "ESCOLA") {
       setErro(
-        "Ingressos individuais não permitem liberação gerencial."
+        "A liberação gerencial está disponível apenas para ingressos das escolas."
       );
       return;
     }
@@ -831,6 +842,7 @@ export default function CredenciamentoClient() {
     if (saindo) return;
 
     setSaindo(true);
+
     await pararCamera();
 
     try {
@@ -869,7 +881,8 @@ export default function CredenciamentoClient() {
     tela === "scanner" &&
     (cameraAtiva || iniciandoCamera);
 
-  const ingressoIndividual = ehIndividual(ingresso);
+  const ingressoImprensa = ingresso?.tipo === "IMPRENSA";
+  const ingressoUsoUnico = ehUsoUnico(ingresso);
 
   // ==========================================
   // INTERFACE
@@ -1175,7 +1188,7 @@ export default function CredenciamentoClient() {
 
               {/* IDENTIFICAÇÃO DO TIPO */}
 
-              {ingressoIndividual && (
+              {ingressoUsoUnico && (
                 <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-[#F4C75D]/30 bg-[#F4C75D]/10 px-3 py-1.5">
                   <Ticket
                     size={14}
@@ -1183,7 +1196,9 @@ export default function CredenciamentoClient() {
                   />
 
                   <span className="text-[11px] font-bold uppercase tracking-wider text-[#F4C75D]">
-                    Ingresso individual
+                    {ingressoImprensa
+                      ? "Ingresso imprensa"
+                      : "Ingresso individual"}
                   </span>
                 </div>
               )}
@@ -1192,7 +1207,7 @@ export default function CredenciamentoClient() {
                 {nomeDoIngresso(ingresso)}
               </h1>
 
-              {ingressoIndividual && (
+              {ingressoUsoUnico && (
                 <div className="mt-3 rounded-xl border border-white/10 bg-black/15 px-3 py-3">
                   <p className="text-sm font-semibold text-emerald-100">
                     1 entrada por QR Code
@@ -1317,8 +1332,11 @@ export default function CredenciamentoClient() {
               />
 
               <span className="absolute left-0 top-7 h-2 w-1 rotate-[-35deg] rounded-full bg-[#F5C95F]" />
+
               <span className="absolute right-1 top-4 h-2 w-1 rotate-[30deg] rounded-full bg-[#F5C95F]" />
+
               <span className="absolute bottom-5 left-3 h-1 w-2 rotate-[25deg] rounded-full bg-[#F5C95F]" />
+
               <span className="absolute bottom-7 right-0 h-2 w-1 rotate-[-20deg] rounded-full bg-[#F5C95F]" />
             </div>
 
@@ -1409,7 +1427,7 @@ export default function CredenciamentoClient() {
 
             {/* LIBERAÇÃO APENAS PARA ESCOLAS */}
 
-            {ingresso && !ingressoIndividual && (
+            {ingresso?.tipo === "ESCOLA" && (
               <button
                 type="button"
                 onClick={() => {
@@ -1423,9 +1441,9 @@ export default function CredenciamentoClient() {
               </button>
             )}
 
-            {/* INGRESSOS INDIVIDUAIS */}
+            {/* INGRESSOS DE USO ÚNICO */}
 
-            {ingressoIndividual && (
+            {ingressoUsoUnico && (
               <div className="mt-5 rounded-xl border border-[#F4C75D]/20 bg-[#F4C75D]/5 px-4 py-3 text-left">
                 <div className="flex items-start gap-2">
                   <LockKeyhole
@@ -1434,7 +1452,9 @@ export default function CredenciamentoClient() {
                   />
 
                   <p className="text-xs leading-relaxed text-white/70">
-                    Ingresso individual de uso único.
+                    {ingressoImprensa
+                      ? "Ingresso de imprensa de uso único."
+                      : "Ingresso individual de uso único."}{" "}
                     Não é permitida uma nova entrada
                     com este QR Code.
                   </p>
@@ -1507,7 +1527,7 @@ export default function CredenciamentoClient() {
         ===================================== */}
 
         {tela === "liberacao" &&
-          !ingressoIndividual && (
+          ingresso?.tipo === "ESCOLA" && (
             <div className="my-auto w-full py-4">
               <div className="mb-5 text-center">
                 <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-full border border-[#F2C86B]/30 bg-[#F2C86B]/10">
@@ -1526,11 +1546,9 @@ export default function CredenciamentoClient() {
                 </p>
               </div>
 
-              {ingresso && (
-                <div className="mb-5">
-                  <CartaoIngresso ingresso={ingresso} />
-                </div>
-              )}
+              <div className="mb-5">
+                <CartaoIngresso ingresso={ingresso} />
+              </div>
 
               {tentativasRestantes !== null &&
                 !bloqueadoAte && (

@@ -4,6 +4,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/session";
 
+export const dynamic = "force-dynamic";
+
 // ==========================================
 // ERRO DE CONCORRÊNCIA
 // ==========================================
@@ -11,13 +13,14 @@ import { getSession } from "@/lib/session";
 class IngressoIndisponivelError extends Error {}
 
 // ==========================================
-// RESPOSTA DE ERRO
+// RESPOSTAS PADRONIZADAS
 // ==========================================
 
-function respostaErro(
-  mensagem: string,
-  status: number
-) {
+const headers = {
+  "Cache-Control": "no-store",
+};
+
+function respostaErro(mensagem: string, status: number) {
   return NextResponse.json(
     {
       sucesso: false,
@@ -25,9 +28,19 @@ function respostaErro(
     },
     {
       status,
-      headers: {
-        "Cache-Control": "no-store",
-      },
+      headers,
+    }
+  );
+}
+
+function respostaSucesso(dados: object) {
+  return NextResponse.json(
+    {
+      sucesso: true,
+      ...dados,
+    },
+    {
+      headers,
     }
   );
 }
@@ -59,7 +72,7 @@ export async function POST(request: NextRequest) {
     }
 
     // ======================================
-    // 2. VERIFICAR USUÁRIO NO BANCO
+    // 2. VERIFICAR USUÁRIO
     // ======================================
 
     const usuario = await prisma.usuario.findUnique({
@@ -73,11 +86,7 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    if (
-      !usuario ||
-      !usuario.ativo ||
-      usuario.role !== "FUNCIONARIO"
-    ) {
+    if (!usuario?.ativo || usuario.role !== "FUNCIONARIO") {
       return respostaErro(
         "Usuário sem autorização.",
         403
@@ -85,7 +94,7 @@ export async function POST(request: NextRequest) {
     }
 
     // ======================================
-    // 3. VALIDAR CORPO DA REQUISIÇÃO
+    // 3. VALIDAR REQUISIÇÃO
     // ======================================
 
     const body = await request.json().catch(() => null);
@@ -152,7 +161,7 @@ export async function POST(request: NextRequest) {
     }
 
     // ======================================
-    // 6. VALIDAR NÚMERO DO FUNCIONÁRIO
+    // 6. VALIDAR FUNCIONÁRIO
     // ======================================
 
     if (
@@ -180,7 +189,7 @@ export async function POST(request: NextRequest) {
     });
 
     // ======================================
-    // 8. FLUXO ORIGINAL DAS ESCOLAS
+    // 8. CONFIRMAR INGRESSO DE ESCOLA
     // ======================================
 
     if (ingresso) {
@@ -198,7 +207,6 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // Mantemos a mesma transação original.
       const entrada = await prisma.$transaction(
         async (tx) => {
           const resultado = await tx.ingresso.updateMany({
@@ -227,25 +235,17 @@ export async function POST(request: NextRequest) {
         }
       );
 
-      return NextResponse.json(
-        {
-          sucesso: true,
-          mensagem: "ENTRADA CONFIRMADA COM SUCESSO!",
-          entrada: {
-            id: entrada.id,
-            nome: entrada.nome,
-            sobrenome: entrada.sobrenome,
-            funcionarioNumero:
-              entrada.funcionarioNumero,
-            horario: entrada.horario,
-          },
+      return respostaSucesso({
+        tipo: "ESCOLA",
+        mensagem: "ENTRADA CONFIRMADA COM SUCESSO!",
+        entrada: {
+          id: entrada.id,
+          nome: entrada.nome,
+          sobrenome: entrada.sobrenome,
+          funcionarioNumero: entrada.funcionarioNumero,
+          horario: entrada.horario,
         },
-        {
-          headers: {
-            "Cache-Control": "no-store",
-          },
-        }
-      );
+      });
     }
 
     // ======================================
@@ -265,82 +265,59 @@ export async function POST(request: NextRequest) {
         },
       });
 
-    if (!ingressoIndividual) {
-      return respostaErro(
-        "Ingresso não encontrado.",
-        404
-      );
-    }
-
     // ======================================
-    // 10. VERIFICAR STATUS INDIVIDUAL
+    // 10. CONFIRMAR INGRESSO INDIVIDUAL
     // ======================================
 
-    if (ingressoIndividual.status === "UTILIZADO") {
-      return respostaErro(
-        "INGRESSO JÁ UTILIZADO",
-        409
-      );
-    }
+    if (ingressoIndividual) {
+      if (ingressoIndividual.status === "UTILIZADO") {
+        return respostaErro(
+          "INGRESSO JÁ UTILIZADO",
+          409
+        );
+      }
 
-    if (ingressoIndividual.status === "CANCELADO") {
-      return respostaErro(
-        "INGRESSO CANCELADO",
-        409
-      );
-    }
+      if (ingressoIndividual.status === "CANCELADO") {
+        return respostaErro(
+          "INGRESSO CANCELADO",
+          409
+        );
+      }
 
-    // ======================================
-    // 11. TRANSAÇÃO ATÔMICA INDIVIDUAL
-    // ======================================
+      const entradaIndividual =
+        await prisma.$transaction(async (tx) => {
+          const resultado =
+            await tx.ingressoConvidado.updateMany({
+              where: {
+                id: ingressoIndividual.id,
+                status: "DISPONIVEL",
+              },
+              data: {
+                status: "UTILIZADO",
+              },
+            });
 
-    const entradaIndividual = await prisma.$transaction(
-      async (tx) => {
-        // Apenas um funcionário consegue mudar
-        // o status de DISPONIVEL para UTILIZADO.
-        const resultado =
-          await tx.ingressoConvidado.updateMany({
-            where: {
-              id: ingressoIndividual.id,
-              status: "DISPONIVEL",
-            },
+          if (resultado.count !== 1) {
+            throw new IngressoIndisponivelError();
+          }
+
+          return tx.entradaConvidado.create({
             data: {
-              status: "UTILIZADO",
+              nome: nomeLimpo,
+              sobrenome: sobrenomeLimpo,
+              ingressoConvidadoId: ingressoIndividual.id,
+              usuarioId: usuario.id,
+              funcionarioNumero,
             },
           });
-
-        if (resultado.count !== 1) {
-          throw new IngressoIndisponivelError();
-        }
-
-        // Cada ingresso individual possui
-        // apenas um registro de entrada.
-        // O banco também protege essa regra
-        // através do campo @unique.
-        return tx.entradaConvidado.create({
-          data: {
-            nome: nomeLimpo,
-            sobrenome: sobrenomeLimpo,
-            ingressoConvidadoId: ingressoIndividual.id,
-            usuarioId: usuario.id,
-            funcionarioNumero,
-          },
         });
-      }
-    );
 
-    // ======================================
-    // 12. CONFIRMAÇÃO INDIVIDUAL
-    // ======================================
+      const nomeCategoria =
+        ingressoIndividual.categoria === "PRESIDENCIA"
+          ? "Presidência"
+          : "Pista";
 
-    const nomeCategoria =
-      ingressoIndividual.categoria === "PRESIDENCIA"
-        ? "Presidência"
-        : "Pista";
-
-    return NextResponse.json(
-      {
-        sucesso: true,
+      return respostaSucesso({
         tipo: "INDIVIDUAL",
         mensagem: "ENTRADA CONFIRMADA COM SUCESSO!",
         ingresso: {
@@ -356,16 +333,140 @@ export async function POST(request: NextRequest) {
             entradaIndividual.funcionarioNumero,
           horario: entradaIndividual.horario,
         },
-      },
-      {
-        headers: {
-          "Cache-Control": "no-store",
+      });
+    }
+
+    // ======================================
+    // 11. BUSCAR INGRESSO DA IMPRENSA
+    // ======================================
+
+    const ingressoImprensa =
+      await prisma.ingressoImprensa.findUnique({
+        where: {
+          qrToken,
         },
-      }
-    );
+        select: {
+          id: true,
+          codigo: true,
+          numero: true,
+          status: true,
+          veiculo: {
+            select: {
+              nome: true,
+              slug: true,
+              ativo: true,
+            },
+          },
+        },
+      });
+
+    if (!ingressoImprensa) {
+      return respostaErro(
+        "Ingresso não encontrado.",
+        404
+      );
+    }
+
+    // ======================================
+    // 12. VERIFICAR VEÍCULO ATIVO
+    // ======================================
+
+    if (!ingressoImprensa.veiculo.ativo) {
+      return respostaErro(
+        "VEÍCULO DE IMPRENSA INATIVO",
+        409
+      );
+    }
+
+    // ======================================
+    // 13. VERIFICAR STATUS
+    // ======================================
+
+    if (ingressoImprensa.status === "UTILIZADO") {
+      return respostaErro(
+        "INGRESSO JÁ UTILIZADO",
+        409
+      );
+    }
+
+    if (ingressoImprensa.status === "CANCELADO") {
+      return respostaErro(
+        "INGRESSO CANCELADO",
+        409
+      );
+    }
+
+    // ======================================
+    // 14. CONFIRMAR ENTRADA DA IMPRENSA
+    // ======================================
+
+    const entradaImprensa =
+      await prisma.$transaction(async (tx) => {
+        // Atualização condicional:
+        // somente um funcionário pode utilizar
+        // este ingresso.
+
+        const resultado =
+          await tx.ingressoImprensa.updateMany({
+            where: {
+              id: ingressoImprensa.id,
+              status: "DISPONIVEL",
+              veiculo: {
+                ativo: true,
+              },
+            },
+            data: {
+              status: "UTILIZADO",
+            },
+          });
+
+        if (resultado.count !== 1) {
+          throw new IngressoIndisponivelError();
+        }
+
+        // Cada ingresso de imprensa possui
+        // somente uma entrada.
+
+        return tx.entradaImprensa.create({
+          data: {
+            nome: nomeLimpo,
+            sobrenome: sobrenomeLimpo,
+            ingressoImprensaId: ingressoImprensa.id,
+            usuarioId: usuario.id,
+            funcionarioNumero,
+          },
+        });
+      });
+
+    // ======================================
+    // 15. RETORNAR CONFIRMAÇÃO
+    // ======================================
+
+    return respostaSucesso({
+      tipo: "IMPRENSA",
+      mensagem: "ENTRADA CONFIRMADA COM SUCESSO!",
+      ingresso: {
+        codigo: ingressoImprensa.codigo,
+        numero: ingressoImprensa.numero,
+        categoria: "IMPRENSA",
+        nomeCategoria: ingressoImprensa.veiculo.nome,
+        veiculo: {
+          nome: ingressoImprensa.veiculo.nome,
+          slug: ingressoImprensa.veiculo.slug,
+        },
+      },
+      entrada: {
+        id: entradaImprensa.id,
+        nome: entradaImprensa.nome,
+        sobrenome: entradaImprensa.sobrenome,
+        funcionarioNumero:
+          entradaImprensa.funcionarioNumero,
+        horario: entradaImprensa.horario,
+      },
+    });
   } catch (error) {
     // ======================================
-    // 13. CONFLITO ENTRE FUNCIONÁRIOS
+    // CONFLITO ENTRE FUNCIONÁRIOS
     // ======================================
 
     if (error instanceof IngressoIndisponivelError) {
@@ -376,13 +477,10 @@ export async function POST(request: NextRequest) {
     }
 
     // ======================================
-    // 14. ERRO INTERNO
+    // ERRO INTERNO
     // ======================================
 
-    console.error(
-      "Erro ao confirmar entrada:",
-      error
-    );
+    console.error("Erro ao confirmar entrada:", error);
 
     return respostaErro(
       "Erro interno ao confirmar entrada.",

@@ -4,6 +4,20 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/session";
 
+// ==========================================
+// CONFIGURAÇÃO
+// ==========================================
+
+export const dynamic = "force-dynamic";
+
+const headers = {
+  "Cache-Control": "no-store",
+};
+
+// ==========================================
+// VERIFICAR QR CODE
+// ==========================================
+
 export async function POST(request: NextRequest) {
   try {
     // ==========================================
@@ -18,7 +32,10 @@ export async function POST(request: NextRequest) {
           sucesso: false,
           mensagem: "Sessão expirada. Faça login novamente.",
         },
-        { status: 401 }
+        {
+          status: 401,
+          headers,
+        }
       );
     }
 
@@ -28,12 +45,17 @@ export async function POST(request: NextRequest) {
           sucesso: false,
           mensagem: "Acesso exclusivo do gerente.",
         },
-        { status: 403 }
+        {
+          status: 403,
+          headers,
+        }
       );
     }
 
     const usuario = await prisma.usuario.findUnique({
-      where: { id: session.id },
+      where: {
+        id: session.id,
+      },
       select: {
         ativo: true,
         role: true,
@@ -46,7 +68,10 @@ export async function POST(request: NextRequest) {
           sucesso: false,
           mensagem: "Gerente não autorizado.",
         },
-        { status: 403 }
+        {
+          status: 403,
+          headers,
+        }
       );
     }
 
@@ -66,7 +91,10 @@ export async function POST(request: NextRequest) {
           sucesso: false,
           mensagem: "Dados inválidos.",
         },
-        { status: 400 }
+        {
+          status: 400,
+          headers,
+        }
       );
     }
 
@@ -81,7 +109,10 @@ export async function POST(request: NextRequest) {
           sucesso: false,
           mensagem: "QR Code inválido.",
         },
-        { status: 400 }
+        {
+          status: 400,
+          headers,
+        }
       );
     }
 
@@ -90,7 +121,9 @@ export async function POST(request: NextRequest) {
     // ==========================================
 
     const ingresso = await prisma.ingresso.findUnique({
-      where: { qrToken },
+      where: {
+        qrToken,
+      },
       select: {
         id: true,
         codigo: true,
@@ -134,7 +167,7 @@ export async function POST(request: NextRequest) {
           },
         },
         {
-          headers: { "Cache-Control": "no-store" },
+          headers,
         }
       );
     }
@@ -143,24 +176,27 @@ export async function POST(request: NextRequest) {
     // 4. PROCURAR PRESIDÊNCIA E PISTA
     // ==========================================
 
-    const convidado = await prisma.ingressoConvidado.findUnique({
-      where: { qrToken },
-      select: {
-        id: true,
-        codigo: true,
-        numero: true,
-        categoria: true,
-        status: true,
-        entrada: {
-          select: {
-            nome: true,
-            sobrenome: true,
-            horario: true,
-            funcionarioNumero: true,
+    const convidado =
+      await prisma.ingressoConvidado.findUnique({
+        where: {
+          qrToken,
+        },
+        select: {
+          id: true,
+          codigo: true,
+          numero: true,
+          categoria: true,
+          status: true,
+          entrada: {
+            select: {
+              nome: true,
+              sobrenome: true,
+              horario: true,
+              funcionarioNumero: true,
+            },
           },
         },
-      },
-    });
+      });
 
     if (convidado) {
       return NextResponse.json(
@@ -179,13 +215,101 @@ export async function POST(request: NextRequest) {
           },
         },
         {
-          headers: { "Cache-Control": "no-store" },
+          headers,
         }
       );
     }
 
     // ==========================================
-    // 5. QR CODE DESCONHECIDO
+    // 5. PROCURAR INGRESSOS DA IMPRENSA
+    // ==========================================
+
+    const ingressoImprensa =
+      await prisma.ingressoImprensa.findUnique({
+        where: {
+          qrToken,
+        },
+        select: {
+          id: true,
+          codigo: true,
+          numero: true,
+          status: true,
+          veiculo: {
+            select: {
+              id: true,
+              nome: true,
+              slug: true,
+              ativo: true,
+            },
+          },
+          entrada: {
+            select: {
+              nome: true,
+              sobrenome: true,
+              horario: true,
+              funcionarioNumero: true,
+            },
+          },
+        },
+      });
+
+    if (ingressoImprensa) {
+      // ========================================
+      // ORGANIZAR DADOS DO VEÍCULO
+      // ========================================
+
+      const veiculo = ingressoImprensa.veiculo;
+
+      const ultimaEntrada =
+        ingressoImprensa.entrada ?? null;
+
+      // ========================================
+      // RETORNAR RESULTADO DA IMPRENSA
+      // ========================================
+
+      return NextResponse.json(
+        {
+          sucesso: true,
+          reconhecido: true,
+
+          tipo: "IMPRENSA",
+          categoria: "IMPRENSA",
+
+          ingresso: {
+            id: ingressoImprensa.id,
+            codigo: ingressoImprensa.codigo,
+            numero: ingressoImprensa.numero,
+            status: ingressoImprensa.status,
+
+            categoria: "IMPRENSA",
+
+            veiculo: {
+              nome: veiculo.nome,
+              slug: veiculo.slug,
+            },
+
+            ultimaEntrada,
+          },
+
+          // Informações adicionais para
+          // possíveis integrações futuras.
+          imprensa: {
+            veiculoId: veiculo.id,
+            veiculoNome: veiculo.nome,
+            veiculoSlug: veiculo.slug,
+            veiculoAtivo: veiculo.ativo,
+            permiteAcompanhantes: false,
+            usoUnico: true,
+          },
+        },
+        {
+          headers,
+        }
+      );
+    }
+
+    // ==========================================
+    // 6. QR CODE DESCONHECIDO
     // ==========================================
 
     return NextResponse.json(
@@ -195,7 +319,7 @@ export async function POST(request: NextRequest) {
         mensagem: "QR Code não pertence ao sistema.",
       },
       {
-        headers: { "Cache-Control": "no-store" },
+        headers,
       }
     );
   } catch (error) {
@@ -206,7 +330,10 @@ export async function POST(request: NextRequest) {
         sucesso: false,
         mensagem: "Erro interno ao verificar QR Code.",
       },
-      { status: 500 }
+      {
+        status: 500,
+        headers,
+      }
     );
   }
 }

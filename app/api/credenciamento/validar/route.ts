@@ -4,14 +4,17 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/session";
 
+export const dynamic = "force-dynamic";
+
 // ==========================================
-// RESPOSTA PADRONIZADA DE ERRO
+// RESPOSTAS PADRONIZADAS
 // ==========================================
 
-function respostaErro(
-  mensagem: string,
-  status: number
-) {
+const headers = {
+  "Cache-Control": "no-store",
+};
+
+function respostaErro(mensagem: string, status: number) {
   return NextResponse.json(
     {
       sucesso: false,
@@ -19,9 +22,19 @@ function respostaErro(
     },
     {
       status,
-      headers: {
-        "Cache-Control": "no-store",
-      },
+      headers,
+    }
+  );
+}
+
+function respostaSucesso(dados: object) {
+  return NextResponse.json(
+    {
+      sucesso: true,
+      ...dados,
+    },
+    {
+      headers,
     }
   );
 }
@@ -53,7 +66,7 @@ export async function POST(request: NextRequest) {
     }
 
     // ======================================
-    // 2. VERIFICAR USUÁRIO NO BANCO
+    // 2. VERIFICAR USUÁRIO
     // ======================================
 
     const usuario = await prisma.usuario.findUnique({
@@ -66,16 +79,12 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    if (
-      !usuario ||
-      !usuario.ativo ||
-      usuario.role !== "FUNCIONARIO"
-    ) {
+    if (!usuario?.ativo || usuario.role !== "FUNCIONARIO") {
       return respostaErro("Acesso negado.", 403);
     }
 
     // ======================================
-    // 3. VALIDAR CORPO DA REQUISIÇÃO
+    // 3. VALIDAR REQUISIÇÃO
     // ======================================
 
     const body = await request.json().catch(() => null);
@@ -93,10 +102,6 @@ export async function POST(request: NextRequest) {
 
     const { qrToken } = body;
 
-    // ======================================
-    // 4. VALIDAR TOKEN DO QR CODE
-    // ======================================
-
     if (
       typeof qrToken !== "string" ||
       !/^[a-f0-9]{64}$/i.test(qrToken)
@@ -105,7 +110,7 @@ export async function POST(request: NextRequest) {
     }
 
     // ======================================
-    // 5. BUSCAR INGRESSO DE ESCOLA
+    // 4. BUSCAR INGRESSO DE ESCOLA
     // ======================================
 
     const ingresso = await prisma.ingresso.findUnique({
@@ -137,50 +142,39 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // ======================================
-    // 6. SE FOR INGRESSO DE ESCOLA
-    // ======================================
-
     if (ingresso) {
       const ultimaEntrada =
         ingresso.status === "UTILIZADO"
           ? ingresso.entradas[0] ?? null
           : null;
 
-      return NextResponse.json(
-        {
-          sucesso: true,
-          tipo: "ESCOLA",
+      return respostaSucesso({
+        tipo: "ESCOLA",
+        status: ingresso.status,
+        ingresso: {
+          id: ingresso.id,
+          codigo: ingresso.codigo,
           status: ingresso.status,
-          ingresso: {
-            id: ingresso.id,
-            codigo: ingresso.codigo,
-            status: ingresso.status,
-            tipo: "ESCOLA",
-            categoria: null,
-            escola: {
-              nome: ingresso.escola.nome,
-            },
-            ultimaEntrada: ultimaEntrada
-              ? {
-                  nome: ultimaEntrada.nome,
-                  sobrenome: ultimaEntrada.sobrenome,
-                  horario:
-                    ultimaEntrada.horario.toISOString(),
-                }
-              : null,
+          tipo: "ESCOLA",
+          categoria: null,
+          escola: {
+            nome: ingresso.escola.nome,
           },
+          ultimaEntrada: ultimaEntrada
+            ? {
+                nome: ultimaEntrada.nome,
+                sobrenome: ultimaEntrada.sobrenome,
+                horario:
+                  ultimaEntrada.horario.toISOString(),
+              }
+            : null,
         },
-        {
-          headers: {
-            "Cache-Control": "no-store",
-          },
-        }
-      );
+      });
     }
 
     // ======================================
-    // 7. BUSCAR INGRESSO INDIVIDUAL
+    // 5. BUSCAR INGRESSO INDIVIDUAL
+    // PRESIDÊNCIA OU PISTA
     // ======================================
 
     const ingressoIndividual =
@@ -204,34 +198,18 @@ export async function POST(request: NextRequest) {
         },
       });
 
-    if (!ingressoIndividual) {
-      return respostaErro(
-        "Ingresso não encontrado.",
-        404
-      );
-    }
+    if (ingressoIndividual) {
+      const nomeCategoria =
+        ingressoIndividual.categoria === "PRESIDENCIA"
+          ? "Presidência"
+          : "Pista";
 
-    // ======================================
-    // 8. IDENTIFICAR CATEGORIA
-    // ======================================
+      const ultimaEntradaIndividual =
+        ingressoIndividual.status === "UTILIZADO"
+          ? ingressoIndividual.entrada
+          : null;
 
-    const nomeCategoria =
-      ingressoIndividual.categoria === "PRESIDENCIA"
-        ? "Presidência"
-        : "Pista";
-
-    const ultimaEntradaIndividual =
-      ingressoIndividual.status === "UTILIZADO"
-        ? ingressoIndividual.entrada
-        : null;
-
-    // ======================================
-    // 9. RETORNAR INGRESSO INDIVIDUAL
-    // ======================================
-
-    return NextResponse.json(
-      {
-        sucesso: true,
+      return respostaSucesso({
         tipo: "INDIVIDUAL",
         status: ingressoIndividual.status,
         ingresso: {
@@ -256,18 +234,110 @@ export async function POST(request: NextRequest) {
               }
             : null,
         },
-      },
-      {
-        headers: {
-          "Cache-Control": "no-store",
+      });
+    }
+
+    // ======================================
+    // 6. BUSCAR INGRESSO DA IMPRENSA
+    // ======================================
+
+    const ingressoImprensa =
+      await prisma.ingressoImprensa.findUnique({
+        where: {
+          qrToken,
         },
-      }
-    );
+        select: {
+          id: true,
+          codigo: true,
+          numero: true,
+          status: true,
+          veiculo: {
+            select: {
+              id: true,
+              nome: true,
+              slug: true,
+              ativo: true,
+            },
+          },
+          entrada: {
+            select: {
+              nome: true,
+              sobrenome: true,
+              horario: true,
+            },
+          },
+        },
+      });
+
+    if (!ingressoImprensa) {
+      return respostaErro(
+        "Ingresso não encontrado.",
+        404
+      );
+    }
+
+    // ======================================
+    // 7. VERIFICAR VEÍCULO DE IMPRENSA
+    // ======================================
+
+    if (!ingressoImprensa.veiculo.ativo) {
+      return respostaErro(
+        "VEÍCULO DE IMPRENSA INATIVO",
+        409
+      );
+    }
+
+    // ======================================
+    // 8. RETORNAR INGRESSO DA IMPRENSA
+    // ======================================
+
+    const nomeVeiculo = ingressoImprensa.veiculo.nome;
+
+    const ultimaEntradaImprensa =
+      ingressoImprensa.status === "UTILIZADO"
+        ? ingressoImprensa.entrada
+        : null;
+
+    return respostaSucesso({
+      tipo: "IMPRENSA",
+      status: ingressoImprensa.status,
+
+      ingresso: {
+        id: ingressoImprensa.id,
+        codigo: ingressoImprensa.codigo,
+        numero: ingressoImprensa.numero,
+        status: ingressoImprensa.status,
+
+        tipo: "IMPRENSA",
+        categoria: "IMPRENSA",
+        nomeCategoria: nomeVeiculo,
+
+        // Compatibilidade com o leitor atual.
+        escola: {
+          nome: nomeVeiculo,
+        },
+
+        veiculo: {
+          id: ingressoImprensa.veiculo.id,
+          nome: nomeVeiculo,
+          slug: ingressoImprensa.veiculo.slug,
+          ativo: ingressoImprensa.veiculo.ativo,
+        },
+
+        permiteAcompanhantes: false,
+
+        ultimaEntrada: ultimaEntradaImprensa
+          ? {
+              nome: ultimaEntradaImprensa.nome,
+              sobrenome: ultimaEntradaImprensa.sobrenome,
+              horario:
+                ultimaEntradaImprensa.horario.toISOString(),
+            }
+          : null,
+      },
+    });
   } catch (error) {
-    console.error(
-      "Erro ao validar ingresso:",
-      error
-    );
+    console.error("Erro ao validar ingresso:", error);
 
     return respostaErro(
       "Erro interno ao validar ingresso.",

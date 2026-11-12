@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/session";
 import { verificarPinGerente } from "@/lib/seguranca-pin";
 
-export const dynamic = "force-dynamic";
+
 
 // ==========================================
 // ERRO DE CONCORRÊNCIA

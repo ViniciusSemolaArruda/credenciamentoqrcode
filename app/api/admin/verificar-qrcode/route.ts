@@ -8,7 +8,7 @@ import { getSession } from "@/lib/session";
 // CONFIGURAÇÃO
 // ==========================================
 
-export const dynamic = "force-dynamic";
+
 
 const headers = {
   "Cache-Control": "no-store",

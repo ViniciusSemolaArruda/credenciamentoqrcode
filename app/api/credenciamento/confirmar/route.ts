@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/session";
+import type { CategoriaConvidado } from "@/app/generated/prisma/client";
 
 // ==========================================
 // ERRO DE CONCORRÊNCIA
@@ -48,11 +49,7 @@ function respostaSucesso(dados: object) {
 // ==========================================
 
 function nomeCategoria(
-  categoria:
-    | "PRESIDENCIA"
-    | "PISTA"
-    | "CONVIDADOS_SANDRO"
-    | "CONVIDADOS_ALBERTO"
+  categoria: CategoriaConvidado
 ): string {
   switch (categoria) {
     case "PRESIDENCIA":
@@ -66,6 +63,12 @@ function nomeCategoria(
 
     case "CONVIDADOS_ALBERTO":
       return "Convidados Alberto";
+
+    case "CORTE_RIO_CARNAVAL_2026":
+      return "Corte do Rio Carnaval 2026";
+
+    default:
+      return "Convidado";
   }
 }
 
@@ -274,7 +277,8 @@ export async function POST(request: NextRequest) {
 
     // ======================================
     // 9. BUSCAR INGRESSO INDIVIDUAL
-    // PRESIDÊNCIA, PISTA, SANDRO E ALBERTO
+    // PRESIDÊNCIA, PISTA, SANDRO,
+    // ALBERTO E CORTE DO RIO CARNAVAL
     // ======================================
 
     const ingressoIndividual =

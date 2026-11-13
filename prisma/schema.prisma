@@ -27,6 +27,7 @@ enum CategoriaConvidado {
   PISTA
   CONVIDADOS_SANDRO
   CONVIDADOS_ALBERTO
+  CORTE_RIO_CARNAVAL_2026
 }
 
 // ==========================================
@@ -227,6 +228,11 @@ model IngressoConvidado {
   categoria CategoriaConvidado
   status    StatusIngresso     @default(DISPONIVEL)
 
+  // Personalização dos ingressos da Corte
+  nomeTitular String?
+  cargo       String?
+  tipoAcesso  String?
+
   // Cada QR Code permite apenas uma entrada.
   // Não há acompanhantes.
   entrada EntradaConvidado?
@@ -234,8 +240,6 @@ model IngressoConvidado {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  // Permite PRESIDENCIA-01 e PISTA-01,
-  // mas impede duplicação dentro da mesma categoria.
   @@unique([categoria, numero])
   @@index([categoria, status])
 }

@@ -27,11 +27,16 @@ import {
   FileArchive,
 } from "lucide-react";
 
+// ==========================================
+// CATEGORIAS
+// ==========================================
+
 type CategoriaIngresso =
   | "PRESIDENCIA"
   | "PISTA"
   | "CONVIDADOS_SANDRO"
-  | "CONVIDADOS_ALBERTO";
+  | "CONVIDADOS_ALBERTO"
+  | "CORTE_RIO_CARNAVAL_2026";
 
 type PageProps = {
   params: Promise<{
@@ -56,7 +61,15 @@ const categorias = {
     nome: "Convidados Alberto",
     icone: UsersRound,
   },
+  CORTE_RIO_CARNAVAL_2026: {
+    nome: "Corte do Rio Carnaval 2026",
+    icone: Crown,
+  },
 };
+
+// ==========================================
+// FORMATAÇÃO DE DATA
+// ==========================================
 
 function formatarData(data: Date) {
   return new Intl.DateTimeFormat("pt-BR", {
@@ -76,6 +89,10 @@ function formatarHorario(data: Date) {
   }).format(data);
 }
 
+// ==========================================
+// VALIDAR CATEGORIA
+// ==========================================
+
 function obterCategoria(
   valor: string
 ): CategoriaIngresso | null {
@@ -85,13 +102,18 @@ function obterCategoria(
     categoria === "PRESIDENCIA" ||
     categoria === "PISTA" ||
     categoria === "CONVIDADOS_SANDRO" ||
-    categoria === "CONVIDADOS_ALBERTO"
+    categoria === "CONVIDADOS_ALBERTO" ||
+    categoria === "CORTE_RIO_CARNAVAL_2026"
   ) {
     return categoria;
   }
 
   return null;
 }
+
+// ==========================================
+// CONTEÚDO DA CATEGORIA
+// ==========================================
 
 async function CategoriaConteudo({
   params,
@@ -108,6 +130,9 @@ async function CategoriaConteudo({
   const configuracao = categorias[categoria];
   const nomeCategoria = configuracao.nome;
   const IconeCategoria = configuracao.icone;
+
+  const ehCorte =
+    categoria === "CORTE_RIO_CARNAVAL_2026";
 
   // ==========================================
   // BUSCAR INGRESSOS
@@ -127,6 +152,12 @@ async function CategoriaConteudo({
         codigo: true,
         qrToken: true,
         status: true,
+
+        // Dados personalizados da Corte
+        nomeTitular: true,
+        cargo: true,
+        tipoAcesso: true,
+
         entrada: {
           select: {
             id: true,
@@ -188,12 +219,20 @@ async function CategoriaConteudo({
     (ingresso) => ingresso.status === "CANCELADO"
   ).length;
 
+  // ==========================================
+  // DADOS PARA DOWNLOAD
+  // ==========================================
+
   const dadosDownloads = ingressosComQR.map(
     (ingresso) => ({
       id: ingresso.id,
       codigo: ingresso.codigo,
       numero: ingresso.numero,
       qrImage: ingresso.qrImage,
+
+      nomeTitular: ingresso.nomeTitular,
+      cargo: ingresso.cargo,
+      tipoAcesso: ingresso.tipoAcesso,
     })
   );
 
@@ -204,7 +243,6 @@ async function CategoriaConteudo({
       <div className="pointer-events-none absolute inset-x-0 top-0 h-80 bg-[radial-gradient(ellipse_at_top,rgba(33,54,61,0.35),transparent_70%)]" />
 
       <div className="relative mx-auto w-full max-w-lg px-4 pb-8 pt-5">
-
         {/* CABEÇALHO */}
         <header className="mb-5 flex items-center gap-3">
           <div className="relative h-11 w-11 shrink-0">
@@ -264,6 +302,26 @@ async function CategoriaConteudo({
             entradas e QR Codes.
           </p>
 
+          {ehCorte && (
+            <div className="mt-4 flex items-center gap-2 rounded-xl border border-[#F4C75D]/25 bg-[#F4C75D]/10 px-3 py-3">
+              <Crown
+                size={19}
+                className="shrink-0 text-[#F4C75D]"
+              />
+
+              <div>
+                <p className="text-xs font-extrabold tracking-wide text-[#F4C75D]">
+                  ACESSO CAMAROTE
+                </p>
+
+                <p className="mt-1 text-[11px] text-white/55">
+                  Ingressos personalizados para os
+                  integrantes da Corte.
+                </p>
+              </div>
+            </div>
+          )}
+
           <div className="mt-4 flex items-center gap-2 rounded-lg border border-white/10 bg-black/15 px-3 py-2.5">
             <ShieldCheck
               size={16}
@@ -279,7 +337,6 @@ async function CategoriaConteudo({
 
         {/* ESTATÍSTICAS */}
         <section className="mb-6 grid grid-cols-2 gap-3">
-
           <div className="rounded-2xl border border-[#F4C75D]/20 bg-[#211C12] p-4">
             <Ticket
               size={20}
@@ -341,10 +398,7 @@ async function CategoriaConteudo({
           </div>
         </section>
 
-        {/* ======================================
-            BAIXAR TODOS EM ZIP
-        ====================================== */}
-
+        {/* DOWNLOAD DE TODOS OS INGRESSOS */}
         <section className="mb-7 rounded-2xl border border-[#F4C75D]/30 bg-gradient-to-br from-[#2D2517] to-[#141D25] p-4">
           <div className="mb-4 flex items-start gap-3">
             <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#F4C75D]/10">
@@ -373,10 +427,12 @@ async function CategoriaConteudo({
           />
 
           <p className="mt-3 text-center text-[10px] text-white/40">
-            {categoria === "CONVIDADOS_SANDRO" ||
-            categoria === "CONVIDADOS_ALBERTO"
-              ? "Todos os PNGs serão gerados com a arte oficial do festival."
-              : "Todos os QR Codes serão reunidos em um único ZIP."}
+            {ehCorte
+              ? "Os ingressos da Corte terão identificação personalizada e acesso CAMAROTE."
+              : categoria === "CONVIDADOS_SANDRO" ||
+                  categoria === "CONVIDADOS_ALBERTO"
+                ? "Todos os PNGs serão gerados com a arte oficial do festival."
+                : "Todos os QR Codes serão reunidos em um único ZIP."}
           </p>
         </section>
 
@@ -407,7 +463,7 @@ async function CategoriaConteudo({
           </div>
         )}
 
-        {/* LISTAGEM */}
+        {/* LISTAGEM DOS INGRESSOS */}
         <section className="grid gap-4 sm:grid-cols-2">
           {ingressosComQR.map((ingresso) => {
             const utilizado =
@@ -427,7 +483,6 @@ async function CategoriaConteudo({
                 key={ingresso.id}
                 className="overflow-hidden rounded-2xl border border-white/[0.08] bg-[#141D25]"
               >
-
                 {/* CABEÇALHO DO INGRESSO */}
                 <div className="flex items-center justify-between gap-2 border-b border-white/[0.08] px-4 py-3">
                   <h3 className="text-sm font-bold">
@@ -452,7 +507,6 @@ async function CategoriaConteudo({
                 </div>
 
                 <div className="p-4">
-
                   {/* QR CODE */}
                   <div className="mx-auto mb-4 max-w-[250px] rounded-xl bg-white p-3">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -464,11 +518,42 @@ async function CategoriaConteudo({
                   </div>
 
                   {/* IDENTIFICAÇÃO */}
-                  <p className="truncate text-center text-sm font-semibold">
-                    {nomeCategoria}
-                  </p>
+                  {ehCorte ? (
+                    <div className="text-center">
+                      <p className="text-base font-extrabold text-white">
+                        {ingresso.nomeTitular ||
+                          "Integrante da Corte"}
+                      </p>
 
-                  <p className="mt-1 text-center text-xs text-white/45">
+                      {ingresso.cargo && (
+                        <p className="mt-1 text-xs font-semibold text-[#F4C75D]">
+                          {ingresso.cargo}
+                        </p>
+                      )}
+
+                      <div className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-[#F4C75D]/30 bg-[#F4C75D]/10 px-3 py-1.5">
+                        <Crown
+                          size={13}
+                          className="text-[#F4C75D]"
+                        />
+
+                        <span className="text-[11px] font-extrabold tracking-wide text-[#F4C75D]">
+                          {ingresso.tipoAcesso ||
+                            "CAMAROTE"}
+                        </span>
+                      </div>
+
+                      <p className="mt-3 text-[11px] text-white/45">
+                        {nomeCategoria}
+                      </p>
+                    </div>
+                  ) : (
+                    <p className="truncate text-center text-sm font-semibold">
+                      {nomeCategoria}
+                    </p>
+                  )}
+
+                  <p className="mt-2 text-center text-xs text-white/45">
                     Ingresso #{numeroFormatado}
                   </p>
 
@@ -491,7 +576,6 @@ async function CategoriaConteudo({
                       </div>
 
                       <div className="space-y-3 p-3">
-
                         {/* PARTICIPANTE */}
                         <div className="flex items-start gap-2.5">
                           <UserRound
@@ -533,7 +617,6 @@ async function CategoriaConteudo({
 
                         {/* DATA E HORÁRIO */}
                         <div className="grid grid-cols-2 gap-3 border-t border-emerald-500/15 pt-3">
-
                           <div className="flex items-start gap-2">
                             <CalendarDays
                               size={15}
@@ -596,11 +679,13 @@ async function CategoriaConteudo({
                         codigo: ingresso.codigo,
                         numero: ingresso.numero,
                         qrImage: ingresso.qrImage,
+                        nomeTitular: ingresso.nomeTitular,
+                        cargo: ingresso.cargo,
+                        tipoAcesso: ingresso.tipoAcesso,
                       },
                     ]}
                     modo="individual"
                   />
-
                 </div>
               </article>
             );
@@ -616,6 +701,10 @@ async function CategoriaConteudo({
   );
 }
 
+// ==========================================
+// CARREGAMENTO
+// ==========================================
+
 function CategoriaLoading() {
   return (
     <main className="flex min-h-[65dvh] items-center justify-center bg-[#080F15] px-5 text-white">
@@ -629,6 +718,10 @@ function CategoriaLoading() {
     </main>
   );
 }
+
+// ==========================================
+// PÁGINA
+// ==========================================
 
 export default function CategoriaPage({
   params,

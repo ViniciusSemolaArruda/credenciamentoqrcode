@@ -6,7 +6,7 @@ import Link from "next/link";
 
 import { prisma } from "@/lib/prisma";
 import AutoRefresh from "@/app/components/AutoRefresh";
-
+import type { CategoriaConvidado } from "@/app/generated/prisma/client";
 import {
   CheckCircle2,
   UnlockKeyhole,
@@ -94,12 +94,12 @@ function formatarData(data: Date) {
 // NOMES DAS CATEGORIAS
 // ==========================================
 
+// ==========================================
+// NOMES DAS CATEGORIAS
+// ==========================================
+
 function nomeCategoria(
-  categoria:
-    | "PRESIDENCIA"
-    | "PISTA"
-    | "CONVIDADOS_SANDRO"
-    | "CONVIDADOS_ALBERTO"
+  categoria: CategoriaConvidado
 ): string {
   switch (categoria) {
     case "PRESIDENCIA":
@@ -113,6 +113,9 @@ function nomeCategoria(
 
     case "CONVIDADOS_ALBERTO":
       return "Convidados Alberto";
+
+    case "CORTE_RIO_CARNAVAL_2026":
+      return "Corte do Rio Carnaval 2026";
 
     default:
       return "Convidado";
@@ -392,33 +395,7 @@ async function PainelConteudo({
           />
         </Link>
 
-        {/* GERENCIAMENTO DE CONVIDADOS */}
-        <Link
-          href="/admin/convidados"
-          className="group mb-5 flex items-center gap-3 rounded-2xl border border-[#F4C75D]/25 bg-gradient-to-r from-[#2C2518] to-[#141D25] p-4 transition hover:border-[#F4C75D]/60 hover:brightness-110"
-        >
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[#F4C75D]/10">
-            <Users
-              size={25}
-              className="text-[#F4C75D]"
-            />
-          </div>
-
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-bold text-white">
-              Convidados Especiais
-            </p>
-
-            <p className="mt-1 text-[11px] leading-relaxed text-white/45">
-              Gerenciar ingressos de Sandro e Alberto
-            </p>
-          </div>
-
-          <ArrowRight
-            size={19}
-            className="shrink-0 text-[#F4C75D] transition-transform group-hover:translate-x-1"
-          />
-        </Link>
+        
 
         {/* ESTATÍSTICAS */}
         <section className="grid grid-cols-3 gap-2.5">

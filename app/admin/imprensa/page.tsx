@@ -10,7 +10,7 @@ import AutoRefresh from "@/app/components/AutoRefresh";
 import {
   ArrowLeft,
   ArrowRight,
-  Users,
+  Newspaper,
   Ticket,
   Clock3,
   CheckCircle2,
@@ -18,37 +18,24 @@ import {
   ShieldCheck,
 } from "lucide-react";
 
-const grupos = [
-  {
-    categoria: "CONVIDADOS_SANDRO",
-    nome: "Convidados Sandro",
-    slug: "sandro",
-  },
-  {
-    categoria: "CONVIDADOS_ALBERTO",
-    nome: "Convidados Alberto",
-    slug: "alberto",
-  },
-] as const;
-
-async function ConvidadosConteudo() {
+async function ImprensaConteudo() {
   await requireRole("ADMIN");
 
-  const ingressos = await prisma.ingressoConvidado.findMany({
-    where: {
-      categoria: {
-        in: [
-          "CONVIDADOS_SANDRO",
-          "CONVIDADOS_ALBERTO",
-        ],
+  const veiculos = await prisma.veiculoImprensa.findMany({
+    orderBy: { nome: "asc" },
+    include: {
+      ingressos: {
+        select: {
+          id: true,
+          status: true,
+        },
       },
     },
-    select: {
-      id: true,
-      categoria: true,
-      status: true,
-    },
   });
+
+  const ingressos = veiculos.flatMap(
+    (veiculo) => veiculo.ingressos
+  );
 
   const total = ingressos.length;
 
@@ -85,12 +72,11 @@ async function ConvidadosConteudo() {
 
           <div>
             <h1 className="text-[19px] font-bold tracking-tight">
-              Ingressos dos Convidados
+              Ingressos da Imprensa
             </h1>
 
             <div className="mt-1 flex items-center gap-1.5">
               <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" />
-
               <p className="text-[11px] text-white/45">
                 Dados atualizados automaticamente
               </p>
@@ -119,13 +105,12 @@ async function ConvidadosConteudo() {
           </p>
 
           <h2 className="text-xl font-extrabold">
-            Credenciamento de Convidados
+            Credenciamento de Imprensa
           </h2>
 
           <p className="mt-2 text-xs leading-relaxed text-white/45">
-            Gerencie os ingressos dos convidados especiais
-            de Sandro e Alberto. Cada QR Code é individual
-            e permite apenas uma entrada.
+            Gerencie os ingressos dos veículos de imprensa.
+            Cada QR Code é individual e permite apenas uma entrada.
           </p>
         </section>
 
@@ -160,15 +145,10 @@ async function ConvidadosConteudo() {
               key={titulo}
               className="rounded-2xl border border-white/10 bg-[#141D25] p-4"
             >
-              <Icone
-                size={20}
-                className={`mb-3 ${cor}`}
-              />
-
+              <Icone size={20} className={`mb-3 ${cor}`} />
               <p className="text-2xl font-extrabold">
                 {valor}
               </p>
-
               <p className="mt-1 text-xs text-white/50">
                 {titulo}
               </p>
@@ -178,27 +158,22 @@ async function ConvidadosConteudo() {
 
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-lg font-bold">
-            Grupos de convidados
+            Veículos de imprensa
           </h2>
-
           <span className="text-xs text-white/40">
-            {grupos.length} grupos
+            {veiculos.length} veículos
           </span>
         </div>
 
         <section className="space-y-3">
-          {grupos.map((grupo) => {
-            const ingressosGrupo = ingressos.filter(
-              (item) => item.categoria === grupo.categoria
-            );
+          {veiculos.map((veiculo) => {
+            const quantidade = veiculo.ingressos.length;
 
-            const quantidade = ingressosGrupo.length;
-
-            const usados = ingressosGrupo.filter(
+            const usados = veiculo.ingressos.filter(
               (item) => item.status === "UTILIZADO"
             ).length;
 
-            const livres = ingressosGrupo.filter(
+            const livres = veiculo.ingressos.filter(
               (item) => item.status === "DISPONIVEL"
             ).length;
 
@@ -209,13 +184,13 @@ async function ConvidadosConteudo() {
 
             return (
               <Link
-                key={grupo.categoria}
-                href={`/admin/convidados/${grupo.slug}`}
+                key={veiculo.id}
+                href={`/admin/imprensa/${veiculo.slug}`}
                 className="block rounded-2xl border border-white/[0.08] bg-[#141D25] p-4 transition hover:border-[#F4C75D]/40 hover:bg-[#18232C]"
               >
                 <div className="flex items-start gap-3">
                   <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-[#F4C75D]/15 bg-[#F4C75D]/10">
-                    <Users
+                    <Newspaper
                       size={21}
                       className="text-[#F4C75D]"
                     />
@@ -223,11 +198,11 @@ async function ConvidadosConteudo() {
 
                   <div className="min-w-0 flex-1">
                     <h3 className="text-sm font-bold">
-                      {grupo.nome}
+                      {veiculo.nome}
                     </h3>
 
                     <p className="mt-1 text-[11px] text-white/40">
-                      {quantidade} ingressos de convidados
+                      {quantidade} ingressos de imprensa
                     </p>
 
                     <div className="mt-2 flex items-center gap-1.5 text-[11px] text-white/50">
@@ -253,7 +228,6 @@ async function ConvidadosConteudo() {
                   <span className="text-emerald-400">
                     {livres} disponíveis
                   </span>
-
                   <span className="text-blue-400">
                     {usados} utilizados
                   </span>
@@ -263,11 +237,9 @@ async function ConvidadosConteudo() {
           })}
         </section>
 
-        {total === 0 && (
-          <div className="mt-4 rounded-2xl border border-white/10 bg-[#141D25] p-5 text-center text-sm text-white/50">
-            Nenhum ingresso de convidados cadastrado.
-            Execute o script de geração dos ingressos
-            para preencher os grupos.
+        {veiculos.length === 0 && (
+          <div className="rounded-2xl border border-white/10 bg-[#141D25] p-8 text-center text-sm text-white/50">
+            Nenhum veículo de imprensa cadastrado.
           </div>
         )}
 
@@ -279,16 +251,16 @@ async function ConvidadosConteudo() {
   );
 }
 
-export default function ConvidadosPage() {
+export default function ImprensaPage() {
   return (
     <Suspense
       fallback={
         <main className="flex min-h-dvh items-center justify-center bg-[#080F15] text-white/60">
-          Carregando convidados...
+          Carregando imprensa...
         </main>
       }
     >
-      <ConvidadosConteudo />
+      <ImprensaConteudo />
     </Suspense>
   );
 }

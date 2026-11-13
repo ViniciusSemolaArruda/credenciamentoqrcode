@@ -23,6 +23,7 @@ import {
 // CONFIGURAÇÃO DAS CATEGORIAS
 // ==========================================
 
+
 const categorias = [
   {
     id: "PRESIDENCIA" as const,
@@ -52,7 +53,15 @@ const categorias = [
     icone: UsersRound,
     quantidade: 100,
   },
+  {
+    id: "CORTE_RIO_CARNAVAL_2026" as const,
+    nome: "Corte do Rio Carnaval 2026",
+    descricao: "6 ingressos nominais com acesso CAMAROTE",
+    icone: Crown,
+    quantidade: 6,
+  },
 ];
+
 
 // ==========================================
 // CONTEÚDO PRINCIPAL
@@ -155,7 +164,8 @@ async function IngressosIndividuaisConteudo() {
 
           <p className="mt-2 text-xs leading-relaxed text-white/45">
             Gerenciamento dos ingressos de Presidência,
-            Pista, Convidados Sandro e Convidados Alberto.
+Pista, Convidados Sandro, Convidados Alberto
+e Corte do Rio Carnaval 2026.
             Cada QR Code é individual, permite apenas
             uma entrada e não inclui acompanhantes.
           </p>

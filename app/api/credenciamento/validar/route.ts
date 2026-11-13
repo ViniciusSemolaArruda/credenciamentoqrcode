@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/session";
+import type { CategoriaConvidado } from "@/app/generated/prisma/client";
 
 // ==========================================
 // RESPOSTAS PADRONIZADAS
@@ -42,11 +43,7 @@ function respostaSucesso(dados: object) {
 // ==========================================
 
 function nomeCategoria(
-  categoria:
-    | "PRESIDENCIA"
-    | "PISTA"
-    | "CONVIDADOS_SANDRO"
-    | "CONVIDADOS_ALBERTO"
+  categoria: CategoriaConvidado
 ): string {
   switch (categoria) {
     case "PRESIDENCIA":
@@ -60,6 +57,12 @@ function nomeCategoria(
 
     case "CONVIDADOS_ALBERTO":
       return "Convidados Alberto";
+
+    case "CORTE_RIO_CARNAVAL_2026":
+      return "Corte do Rio Carnaval 2026";
+
+    default:
+      return "Convidado";
   }
 }
 
@@ -198,7 +201,8 @@ export async function POST(request: NextRequest) {
 
     // ======================================
     // 5. BUSCAR INGRESSO INDIVIDUAL
-    // PRESIDÊNCIA, PISTA, SANDRO E ALBERTO
+    // PRESIDÊNCIA, PISTA, SANDRO, ALBERTO
+    // E CORTE DO RIO CARNAVAL 2026
     // ======================================
 
     const ingressoIndividual =
@@ -212,6 +216,12 @@ export async function POST(request: NextRequest) {
           numero: true,
           categoria: true,
           status: true,
+
+          // Dados personalizados da Corte
+          nomeTitular: true,
+          cargo: true,
+          tipoAcesso: true,
+
           entrada: {
             select: {
               nome: true,
@@ -227,6 +237,10 @@ export async function POST(request: NextRequest) {
         ingressoIndividual.categoria
       );
 
+      const ehCorte =
+        ingressoIndividual.categoria ===
+        "CORTE_RIO_CARNAVAL_2026";
+
       const ultimaEntradaIndividual =
         ingressoIndividual.status === "UTILIZADO"
           ? ingressoIndividual.entrada
@@ -235,20 +249,36 @@ export async function POST(request: NextRequest) {
       return respostaSucesso({
         tipo: "INDIVIDUAL",
         status: ingressoIndividual.status,
+
         ingresso: {
           id: ingressoIndividual.id,
           codigo: ingressoIndividual.codigo,
           numero: ingressoIndividual.numero,
           status: ingressoIndividual.status,
+
           tipo: "INDIVIDUAL",
           categoria: ingressoIndividual.categoria,
           nomeCategoria: nomeCategoriaIngresso,
 
-          // Compatibilidade com o leitor atual.
+          // Personalização exclusiva da Corte
+          nomeTitular: ehCorte
+            ? ingressoIndividual.nomeTitular
+            : null,
+
+          cargo: ehCorte
+            ? ingressoIndividual.cargo
+            : null,
+
+          tipoAcesso: ehCorte
+            ? ingressoIndividual.tipoAcesso ?? "CAMAROTE"
+            : null,
+
+          // Compatibilidade com o leitor atual
           escola: {
             nome: nomeCategoriaIngresso,
           },
 
+          // Ingressos individuais são de uso único
           permiteAcompanhantes: false,
 
           ultimaEntrada: ultimaEntradaIndividual
@@ -339,7 +369,7 @@ export async function POST(request: NextRequest) {
         categoria: "IMPRENSA",
         nomeCategoria: nomeVeiculo,
 
-        // Compatibilidade com o leitor atual.
+        // Compatibilidade com o leitor atual
         escola: {
           nome: nomeVeiculo,
         },

@@ -4,8 +4,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/session";
 
-
-
 // ==========================================
 // ERRO DE CONCORRÊNCIA
 // ==========================================
@@ -43,6 +41,32 @@ function respostaSucesso(dados: object) {
       headers,
     }
   );
+}
+
+// ==========================================
+// NOMES DAS CATEGORIAS INDIVIDUAIS
+// ==========================================
+
+function nomeCategoria(
+  categoria:
+    | "PRESIDENCIA"
+    | "PISTA"
+    | "CONVIDADOS_SANDRO"
+    | "CONVIDADOS_ALBERTO"
+): string {
+  switch (categoria) {
+    case "PRESIDENCIA":
+      return "Presidência";
+
+    case "PISTA":
+      return "Pista";
+
+    case "CONVIDADOS_SANDRO":
+      return "Convidados Sandro";
+
+    case "CONVIDADOS_ALBERTO":
+      return "Convidados Alberto";
+  }
 }
 
 // ==========================================
@@ -250,6 +274,7 @@ export async function POST(request: NextRequest) {
 
     // ======================================
     // 9. BUSCAR INGRESSO INDIVIDUAL
+    // PRESIDÊNCIA, PISTA, SANDRO E ALBERTO
     // ======================================
 
     const ingressoIndividual =
@@ -312,10 +337,9 @@ export async function POST(request: NextRequest) {
           });
         });
 
-      const nomeCategoria =
-        ingressoIndividual.categoria === "PRESIDENCIA"
-          ? "Presidência"
-          : "Pista";
+      const nomeCategoriaIngresso = nomeCategoria(
+        ingressoIndividual.categoria
+      );
 
       return respostaSucesso({
         tipo: "INDIVIDUAL",
@@ -323,7 +347,7 @@ export async function POST(request: NextRequest) {
         ingresso: {
           codigo: ingressoIndividual.codigo,
           categoria: ingressoIndividual.categoria,
-          nomeCategoria,
+          nomeCategoria: nomeCategoriaIngresso,
         },
         entrada: {
           id: entradaIndividual.id,

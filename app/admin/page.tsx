@@ -14,6 +14,7 @@ import {
   ArrowRight,
   Clock3,
   ScanLine,
+  Users,
 } from "lucide-react";
 
 type Periodo = "hoje" | "7dias" | "30dias";
@@ -26,7 +27,7 @@ type PageProps = {
 
 type EntradaPainel = {
   id: string;
-  tipo: "ESCOLA" | "INDIVIDUAL" | "IMPRENSA";
+  tipo: "ESCOLA" | "INDIVIDUAL";
   local: string;
   codigo: string;
   nome: string;
@@ -51,10 +52,7 @@ function obterInicioPeriodo(periodo: Periodo) {
   }).formatToParts(agora);
 
   const valores = Object.fromEntries(
-    partes.map((parte) => [
-      parte.type,
-      parte.value,
-    ])
+    partes.map((parte) => [parte.type, parte.value])
   );
 
   const inicioHoje = new Date(
@@ -62,15 +60,11 @@ function obterInicioPeriodo(periodo: Periodo) {
   );
 
   if (periodo === "7dias") {
-    inicioHoje.setUTCDate(
-      inicioHoje.getUTCDate() - 6
-    );
+    inicioHoje.setUTCDate(inicioHoje.getUTCDate() - 6);
   }
 
   if (periodo === "30dias") {
-    inicioHoje.setUTCDate(
-      inicioHoje.getUTCDate() - 29
-    );
+    inicioHoje.setUTCDate(inicioHoje.getUTCDate() - 29);
   }
 
   return inicioHoje;
@@ -96,12 +90,33 @@ function formatarData(data: Date) {
   }).format(data);
 }
 
+// ==========================================
+// NOMES DAS CATEGORIAS
+// ==========================================
+
 function nomeCategoria(
-  categoria: "PRESIDENCIA" | "PISTA"
-) {
-  return categoria === "PRESIDENCIA"
-    ? "Presidência"
-    : "Pista";
+  categoria:
+    | "PRESIDENCIA"
+    | "PISTA"
+    | "CONVIDADOS_SANDRO"
+    | "CONVIDADOS_ALBERTO"
+): string {
+  switch (categoria) {
+    case "PRESIDENCIA":
+      return "Presidência";
+
+    case "PISTA":
+      return "Pista";
+
+    case "CONVIDADOS_SANDRO":
+      return "Convidados Sandro";
+
+    case "CONVIDADOS_ALBERTO":
+      return "Convidados Alberto";
+
+    default:
+      return "Convidado";
+  }
 }
 
 // ==========================================
@@ -121,14 +136,11 @@ async function PainelConteudo({
   const [
     entradasEscolas,
     entradasIndividuais,
-    entradasImprensa,
     totalLiberacoes,
     canceladosEscolas,
     canceladosIndividuais,
-    canceladosImprensa,
     ultimasEntradasEscolas,
     ultimasEntradasIndividuais,
-    ultimasEntradasImprensa,
   ] = await Promise.all([
     // Entradas das escolas de samba.
     prisma.entrada.count({
@@ -139,17 +151,8 @@ async function PainelConteudo({
       },
     }),
 
-    // Entradas de Presidência e Pista.
+    // Entradas de todas as categorias individuais.
     prisma.entradaConvidado.count({
-      where: {
-        horario: {
-          gte: inicio,
-        },
-      },
-    }),
-
-    // Entradas da imprensa.
-    prisma.entradaImprensa.count({
       where: {
         horario: {
           gte: inicio,
@@ -175,13 +178,6 @@ async function PainelConteudo({
 
     // Cancelamentos atuais dos individuais.
     prisma.ingressoConvidado.count({
-      where: {
-        status: "CANCELADO",
-      },
-    }),
-
-    // Cancelamentos atuais da imprensa.
-    prisma.ingressoImprensa.count({
       where: {
         status: "CANCELADO",
       },
@@ -242,36 +238,6 @@ async function PainelConteudo({
         },
       },
     }),
-
-    // Últimas entradas da imprensa.
-    prisma.entradaImprensa.findMany({
-      where: {
-        horario: {
-          gte: inicio,
-        },
-      },
-      orderBy: {
-        horario: "desc",
-      },
-      take: 8,
-      select: {
-        id: true,
-        nome: true,
-        sobrenome: true,
-        horario: true,
-        funcionarioNumero: true,
-        ingressoImprensa: {
-          select: {
-            codigo: true,
-            veiculo: {
-              select: {
-                nome: true,
-              },
-            },
-          },
-        },
-      },
-    }),
   ]);
 
   // ==========================================
@@ -279,14 +245,10 @@ async function PainelConteudo({
   // ==========================================
 
   const totalEntradas =
-    entradasEscolas +
-    entradasIndividuais +
-    entradasImprensa;
+    entradasEscolas + entradasIndividuais;
 
   const totalCancelados =
-    canceladosEscolas +
-    canceladosIndividuais +
-    canceladosImprensa;
+    canceladosEscolas + canceladosIndividuais;
 
   // ==========================================
   // UNIFICAR ÚLTIMAS ENTRADAS
@@ -318,22 +280,9 @@ async function PainelConteudo({
       funcionarioNumero: entrada.funcionarioNumero,
     }));
 
-  const entradasDaImprensa: EntradaPainel[] =
-    ultimasEntradasImprensa.map((entrada) => ({
-      id: entrada.id,
-      tipo: "IMPRENSA",
-      local: entrada.ingressoImprensa.veiculo.nome,
-      codigo: entrada.ingressoImprensa.codigo,
-      nome: entrada.nome,
-      sobrenome: entrada.sobrenome,
-      horario: entrada.horario,
-      funcionarioNumero: entrada.funcionarioNumero,
-    }));
-
   const ultimasEntradas: EntradaPainel[] = [
     ...entradasDasEscolas,
     ...entradasDeConvidados,
-    ...entradasDaImprensa,
   ]
     .sort(
       (a, b) =>
@@ -355,14 +304,11 @@ async function PainelConteudo({
       <AutoRefresh intervalo={5000} />
 
       {/* EFEITO DE FUNDO */}
-
       <div className="pointer-events-none absolute inset-x-0 top-0 h-80 bg-[radial-gradient(ellipse_at_top,rgba(33,54,61,0.35),transparent_70%)]" />
 
       <div className="relative mx-auto w-full max-w-lg px-4 pb-8 pt-5">
-        {/* ======================================
-            CABEÇALHO
-        ====================================== */}
 
+        {/* CABEÇALHO */}
         <header className="mb-5 flex items-center gap-3">
           <div className="relative h-11 w-11 shrink-0">
             <Image
@@ -390,10 +336,7 @@ async function PainelConteudo({
           </div>
         </header>
 
-        {/* ======================================
-            FILTROS
-        ====================================== */}
-
+        {/* FILTROS */}
         <div className="mb-5 grid grid-cols-3 gap-2 rounded-xl bg-[#121A21] p-1">
           {filtros.map((filtro) => {
             const ativo = periodo === filtro.valor;
@@ -421,10 +364,7 @@ async function PainelConteudo({
           })}
         </div>
 
-        {/* ======================================
-            VERIFICADOR DE QR CODE
-        ====================================== */}
-
+        {/* VERIFICADOR DE QR CODE */}
         <Link
           href="/admin/verificar-qrcode"
           className="group mb-5 flex items-center gap-3 rounded-2xl border border-[#F4C75D]/25 bg-gradient-to-r from-[#2C2518] to-[#141D25] p-4 transition hover:border-[#F4C75D]/60 hover:brightness-110"
@@ -452,13 +392,38 @@ async function PainelConteudo({
           />
         </Link>
 
-        {/* ======================================
-            ESTATÍSTICAS
-        ====================================== */}
+        {/* GERENCIAMENTO DE CONVIDADOS */}
+        <Link
+          href="/admin/convidados"
+          className="group mb-5 flex items-center gap-3 rounded-2xl border border-[#F4C75D]/25 bg-gradient-to-r from-[#2C2518] to-[#141D25] p-4 transition hover:border-[#F4C75D]/60 hover:brightness-110"
+        >
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[#F4C75D]/10">
+            <Users
+              size={25}
+              className="text-[#F4C75D]"
+            />
+          </div>
 
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-bold text-white">
+              Convidados Especiais
+            </p>
+
+            <p className="mt-1 text-[11px] leading-relaxed text-white/45">
+              Gerenciar ingressos de Sandro e Alberto
+            </p>
+          </div>
+
+          <ArrowRight
+            size={19}
+            className="shrink-0 text-[#F4C75D] transition-transform group-hover:translate-x-1"
+          />
+        </Link>
+
+        {/* ESTATÍSTICAS */}
         <section className="grid grid-cols-3 gap-2.5">
-          {/* ENTRADAS */}
 
+          {/* ENTRADAS */}
           <div className="min-w-0 rounded-2xl border border-emerald-500/25 bg-gradient-to-b from-[#103327] to-[#0A1E1B] px-2 py-4 text-center">
             <div className="mx-auto mb-2 flex h-8 w-8 items-center justify-center rounded-full bg-emerald-500/15">
               <CheckCircle2
@@ -477,7 +442,6 @@ async function PainelConteudo({
           </div>
 
           {/* LIBERAÇÕES */}
-
           <div className="min-w-0 rounded-2xl border border-amber-400/25 bg-gradient-to-b from-[#342A14] to-[#211C12] px-2 py-4 text-center">
             <div className="mx-auto mb-2 flex h-8 w-8 items-center justify-center rounded-full bg-amber-400/15">
               <UnlockKeyhole
@@ -496,7 +460,6 @@ async function PainelConteudo({
           </div>
 
           {/* CANCELADOS */}
-
           <div className="min-w-0 rounded-2xl border border-red-500/25 bg-gradient-to-b from-[#35191C] to-[#211215] px-2 py-4 text-center">
             <div className="mx-auto mb-2 flex h-8 w-8 items-center justify-center rounded-full bg-red-500/15">
               <XCircle
@@ -519,10 +482,7 @@ async function PainelConteudo({
           </div>
         </section>
 
-        {/* ======================================
-            ÚLTIMAS ENTRADAS
-        ====================================== */}
-
+        {/* ÚLTIMAS ENTRADAS */}
         <section className="mt-7">
           <div className="mb-3 flex items-center justify-between gap-3">
             <h2 className="text-lg font-bold">
@@ -563,11 +523,9 @@ async function PainelConteudo({
                 >
                   <span
                     className={`h-2.5 w-2.5 shrink-0 rounded-full ${
-                      entrada.tipo === "IMPRENSA"
-                        ? "bg-sky-400 shadow-[0_0_12px_rgba(56,189,248,0.4)]"
-                        : entrada.tipo === "INDIVIDUAL"
-                          ? "bg-[#F4C75D] shadow-[0_0_12px_rgba(244,199,93,0.3)]"
-                          : "bg-[#2DD778] shadow-[0_0_12px_rgba(45,215,120,0.45)]"
+                      entrada.tipo === "INDIVIDUAL"
+                        ? "bg-[#F4C75D] shadow-[0_0_12px_rgba(244,199,93,0.3)]"
+                        : "bg-[#2DD778] shadow-[0_0_12px_rgba(45,215,120,0.45)]"
                     }`}
                   />
 
@@ -595,12 +553,6 @@ async function PainelConteudo({
                         Ingresso individual
                       </p>
                     )}
-
-                    {entrada.tipo === "IMPRENSA" && (
-                      <p className="mt-1 truncate text-[10px] font-medium text-sky-300/80">
-                        Imprensa
-                      </p>
-                    )}
                   </div>
 
                   <span className="shrink-0 text-[10px] text-white/45">
@@ -614,10 +566,7 @@ async function PainelConteudo({
           )}
         </section>
 
-        {/* ======================================
-            RODAPÉ
-        ====================================== */}
-
+        {/* RODAPÉ */}
         <p className="mt-6 text-center text-[10px] text-white/30">
           G.R.E.S. Guardiões da Capadócia
         </p>

@@ -4,8 +4,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/session";
 
-
-
 // ==========================================
 // RESPOSTAS PADRONIZADAS
 // ==========================================
@@ -37,6 +35,32 @@ function respostaSucesso(dados: object) {
       headers,
     }
   );
+}
+
+// ==========================================
+// NOMES DAS CATEGORIAS INDIVIDUAIS
+// ==========================================
+
+function nomeCategoria(
+  categoria:
+    | "PRESIDENCIA"
+    | "PISTA"
+    | "CONVIDADOS_SANDRO"
+    | "CONVIDADOS_ALBERTO"
+): string {
+  switch (categoria) {
+    case "PRESIDENCIA":
+      return "Presidência";
+
+    case "PISTA":
+      return "Pista";
+
+    case "CONVIDADOS_SANDRO":
+      return "Convidados Sandro";
+
+    case "CONVIDADOS_ALBERTO":
+      return "Convidados Alberto";
+  }
 }
 
 // ==========================================
@@ -174,7 +198,7 @@ export async function POST(request: NextRequest) {
 
     // ======================================
     // 5. BUSCAR INGRESSO INDIVIDUAL
-    // PRESIDÊNCIA OU PISTA
+    // PRESIDÊNCIA, PISTA, SANDRO E ALBERTO
     // ======================================
 
     const ingressoIndividual =
@@ -199,10 +223,9 @@ export async function POST(request: NextRequest) {
       });
 
     if (ingressoIndividual) {
-      const nomeCategoria =
-        ingressoIndividual.categoria === "PRESIDENCIA"
-          ? "Presidência"
-          : "Pista";
+      const nomeCategoriaIngresso = nomeCategoria(
+        ingressoIndividual.categoria
+      );
 
       const ultimaEntradaIndividual =
         ingressoIndividual.status === "UTILIZADO"
@@ -219,11 +242,15 @@ export async function POST(request: NextRequest) {
           status: ingressoIndividual.status,
           tipo: "INDIVIDUAL",
           categoria: ingressoIndividual.categoria,
-          nomeCategoria,
+          nomeCategoria: nomeCategoriaIngresso,
+
+          // Compatibilidade com o leitor atual.
           escola: {
-            nome: nomeCategoria,
+            nome: nomeCategoriaIngresso,
           },
+
           permiteAcompanhantes: false,
+
           ultimaEntrada: ultimaEntradaIndividual
             ? {
                 nome: ultimaEntradaIndividual.nome,

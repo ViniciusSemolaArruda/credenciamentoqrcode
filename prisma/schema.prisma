@@ -25,6 +25,8 @@ enum StatusIngresso {
 enum CategoriaConvidado {
   PRESIDENCIA
   PISTA
+  CONVIDADOS_SANDRO
+  CONVIDADOS_ALBERTO
 }
 
 // ==========================================

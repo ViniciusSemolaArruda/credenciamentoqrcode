@@ -2,6 +2,7 @@
 import { Suspense } from "react";
 import Image from "next/image";
 import Link from "next/link";
+
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/auth-guard";
 import AutoRefresh from "@/app/components/AutoRefresh";
@@ -11,6 +12,7 @@ import {
   ArrowRight,
   Ticket,
   Crown,
+  UsersRound,
   CheckCircle2,
   Clock3,
   XCircle,
@@ -27,12 +29,28 @@ const categorias = [
     nome: "Presidência",
     descricao: "Ingressos individuais da Presidência",
     icone: Crown,
+    quantidade: 15,
   },
   {
     id: "PISTA" as const,
     nome: "Pista",
     descricao: "Ingressos individuais de Pista",
     icone: Ticket,
+    quantidade: 15,
+  },
+  {
+    id: "CONVIDADOS_SANDRO" as const,
+    nome: "Convidados Sandro",
+    descricao: "Ingressos exclusivos dos convidados de Sandro",
+    icone: UsersRound,
+    quantidade: 100,
+  },
+  {
+    id: "CONVIDADOS_ALBERTO" as const,
+    nome: "Convidados Alberto",
+    descricao: "Ingressos exclusivos dos convidados de Alberto",
+    icone: UsersRound,
+    quantidade: 100,
   },
 ];
 
@@ -41,18 +59,15 @@ const categorias = [
 // ==========================================
 
 async function IngressosIndividuaisConteudo() {
-  // Somente administradores podem acessar.
   await requireRole("ADMIN");
 
-  // Buscar os ingressos cadastrados no PostgreSQL.
-  const ingressos =
-    await prisma.ingressoConvidado.findMany({
-      select: {
-        id: true,
-        categoria: true,
-        status: true,
-      },
-    });
+  const ingressos = await prisma.ingressoConvidado.findMany({
+    select: {
+      id: true,
+      categoria: true,
+      status: true,
+    },
+  });
 
   // ==========================================
   // ESTATÍSTICAS GERAIS
@@ -85,10 +100,7 @@ async function IngressosIndividuaisConteudo() {
 
       <div className="relative mx-auto w-full max-w-lg px-4 pb-8 pt-5">
 
-        {/* ======================================
-            HEADER PADRÃO
-        ====================================== */}
-
+        {/* HEADER PADRÃO */}
         <header className="mb-6 flex items-center gap-3">
           <div className="relative h-11 w-11 shrink-0">
             <Image
@@ -108,7 +120,6 @@ async function IngressosIndividuaisConteudo() {
 
             <div className="mt-1 flex items-center gap-1.5">
               <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" />
-
               <p className="text-[11px] text-white/45">
                 Dados atualizados automaticamente
               </p>
@@ -117,7 +128,6 @@ async function IngressosIndividuaisConteudo() {
         </header>
 
         {/* VOLTAR */}
-
         <Link
           href="/admin"
           className="mb-5 inline-flex items-center gap-2 text-xs font-semibold text-[#F4C75D] transition hover:text-[#FFE08A]"
@@ -126,10 +136,7 @@ async function IngressosIndividuaisConteudo() {
           Voltar ao painel
         </Link>
 
-        {/* ======================================
-            IDENTIFICAÇÃO
-        ====================================== */}
-
+        {/* IDENTIFICAÇÃO */}
         <section className="mb-6 rounded-2xl border border-[#F4C75D]/20 bg-gradient-to-br from-[#25251D] to-[#141D25] p-5">
           <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-xl border border-[#F4C75D]/20 bg-[#F4C75D]/10">
             <ShieldCheck
@@ -147,19 +154,17 @@ async function IngressosIndividuaisConteudo() {
           </h2>
 
           <p className="mt-2 text-xs leading-relaxed text-white/45">
-            Gerenciamento dos ingressos de Presidência e
-            Pista. Cada QR Code é individual e permite
-            apenas uma entrada.
+            Gerenciamento dos ingressos de Presidência,
+            Pista, Convidados Sandro e Convidados Alberto.
+            Cada QR Code é individual, permite apenas
+            uma entrada e não inclui acompanhantes.
           </p>
         </section>
 
-        {/* ======================================
-            RESUMO GERAL
-        ====================================== */}
-
+        {/* RESUMO GERAL */}
         <section className="mb-4 grid grid-cols-3 gap-2.5">
-          {/* TOTAL */}
 
+          {/* TOTAL */}
           <div className="min-w-0 rounded-2xl border border-[#F4C75D]/25 bg-gradient-to-b from-[#342A14] to-[#211C12] px-2 py-4 text-center">
             <div className="mx-auto mb-2 flex h-8 w-8 items-center justify-center rounded-full bg-[#F4C75D]/15">
               <Ticket
@@ -178,7 +183,6 @@ async function IngressosIndividuaisConteudo() {
           </div>
 
           {/* DISPONÍVEIS */}
-
           <div className="min-w-0 rounded-2xl border border-emerald-500/25 bg-gradient-to-b from-[#103327] to-[#0A1E1B] px-2 py-4 text-center">
             <div className="mx-auto mb-2 flex h-8 w-8 items-center justify-center rounded-full bg-emerald-500/15">
               <Clock3
@@ -197,7 +201,6 @@ async function IngressosIndividuaisConteudo() {
           </div>
 
           {/* UTILIZADOS */}
-
           <div className="min-w-0 rounded-2xl border border-blue-500/25 bg-gradient-to-b from-[#14273A] to-[#101D2A] px-2 py-4 text-center">
             <div className="mx-auto mb-2 flex h-8 w-8 items-center justify-center rounded-full bg-blue-500/15">
               <CheckCircle2
@@ -217,7 +220,6 @@ async function IngressosIndividuaisConteudo() {
         </section>
 
         {/* CANCELADOS */}
-
         {totalCancelados > 0 && (
           <div className="mb-6 flex items-center justify-between rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3">
             <div className="flex items-center gap-2">
@@ -225,7 +227,6 @@ async function IngressosIndividuaisConteudo() {
                 size={17}
                 className="text-red-400"
               />
-
               <span className="text-xs font-semibold text-red-300">
                 Ingressos cancelados
               </span>
@@ -237,10 +238,7 @@ async function IngressosIndividuaisConteudo() {
           </div>
         )}
 
-        {/* ======================================
-            TÍTULO DAS CATEGORIAS
-        ====================================== */}
-
+        {/* TÍTULO DAS CATEGORIAS */}
         <div className="mb-4 mt-7 flex items-center justify-between gap-2">
           <h2 className="text-lg font-bold">
             Categorias
@@ -251,10 +249,7 @@ async function IngressosIndividuaisConteudo() {
           </span>
         </div>
 
-        {/* ======================================
-            LISTA DE CATEGORIAS
-        ====================================== */}
-
+        {/* LISTA DE CATEGORIAS */}
         <section className="space-y-3">
           {categorias.map((categoria) => {
             const Icone = categoria.icone;
@@ -282,9 +277,7 @@ async function IngressosIndividuaisConteudo() {
             ).length;
 
             const percentual =
-              total > 0
-                ? (utilizados / total) * 100
-                : 0;
+              total > 0 ? (utilizados / total) * 100 : 0;
 
             return (
               <Link
@@ -293,7 +286,6 @@ async function IngressosIndividuaisConteudo() {
                 className="block rounded-2xl border border-white/[0.08] bg-[#141D25] p-4 transition hover:border-[#F4C75D]/40 hover:bg-[#18232C]"
               >
                 {/* IDENTIFICAÇÃO */}
-
                 <div className="flex items-start gap-3">
                   <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-[#F4C75D]/15 bg-[#F4C75D]/10">
                     <Icone
@@ -313,9 +305,12 @@ async function IngressosIndividuaisConteudo() {
 
                     <div className="mt-2 flex items-center gap-1.5 text-[11px] text-white/50">
                       <Ticket size={13} />
-
                       {utilizados} de {total} utilizados
                     </div>
+
+                    <p className="mt-1 text-[10px] text-white/30">
+                      Quantidade prevista: {categoria.quantidade}
+                    </p>
                   </div>
 
                   <ArrowRight
@@ -325,7 +320,6 @@ async function IngressosIndividuaisConteudo() {
                 </div>
 
                 {/* BARRA DE PROGRESSO */}
-
                 <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-white/10">
                   <div
                     className="h-full rounded-full bg-gradient-to-r from-[#DCA53D] to-[#FFE08A] transition-all"
@@ -336,7 +330,6 @@ async function IngressosIndividuaisConteudo() {
                 </div>
 
                 {/* ESTATÍSTICAS */}
-
                 <div className="mt-3 flex items-center justify-between gap-2 text-[11px]">
                   <span className="flex items-center gap-1 text-emerald-400">
                     <CheckCircle2 size={12} />
@@ -353,10 +346,7 @@ async function IngressosIndividuaisConteudo() {
           })}
         </section>
 
-        {/* ======================================
-            LISTA VAZIA
-        ====================================== */}
-
+        {/* LISTA VAZIA */}
         {totalIngressos === 0 && (
           <div className="mt-5 rounded-2xl border border-white/10 bg-[#141D25] px-5 py-8 text-center">
             <Ticket
@@ -376,7 +366,6 @@ async function IngressosIndividuaisConteudo() {
         )}
 
         {/* RODAPÉ */}
-
         <p className="mt-7 text-center text-[10px] text-white/30">
           G.R.E.S. Guardiões da Capadócia
         </p>

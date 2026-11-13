@@ -9,6 +9,7 @@ import { requireRole } from "@/lib/auth-guard";
 import AutoRefresh from "@/app/components/AutoRefresh";
 
 import QRCode from "qrcode";
+import DownloadsIngressos from "./DownloadsIngressos";
 
 import {
   ArrowLeft,
@@ -17,19 +18,20 @@ import {
   CheckCircle2,
   Clock3,
   XCircle,
-  Download,
   QrCode,
   UserRound,
+  UsersRound,
   CalendarDays,
   History,
   ShieldCheck,
+  FileArchive,
 } from "lucide-react";
 
-// ==========================================
-// TIPAGEM
-// ==========================================
-
-type CategoriaIngresso = "PRESIDENCIA" | "PISTA";
+type CategoriaIngresso =
+  | "PRESIDENCIA"
+  | "PISTA"
+  | "CONVIDADOS_SANDRO"
+  | "CONVIDADOS_ALBERTO";
 
 type PageProps = {
   params: Promise<{
@@ -37,9 +39,24 @@ type PageProps = {
   }>;
 };
 
-// ==========================================
-// FORMATADORES
-// ==========================================
+const categorias = {
+  PRESIDENCIA: {
+    nome: "Presidência",
+    icone: Crown,
+  },
+  PISTA: {
+    nome: "Pista",
+    icone: Ticket,
+  },
+  CONVIDADOS_SANDRO: {
+    nome: "Convidados Sandro",
+    icone: UsersRound,
+  },
+  CONVIDADOS_ALBERTO: {
+    nome: "Convidados Alberto",
+    icone: UsersRound,
+  },
+};
 
 function formatarData(data: Date) {
   return new Intl.DateTimeFormat("pt-BR", {
@@ -64,45 +81,36 @@ function obterCategoria(
 ): CategoriaIngresso | null {
   const categoria = valor.toUpperCase();
 
-  if (categoria === "PRESIDENCIA") {
-    return "PRESIDENCIA";
-  }
-
-  if (categoria === "PISTA") {
-    return "PISTA";
+  if (
+    categoria === "PRESIDENCIA" ||
+    categoria === "PISTA" ||
+    categoria === "CONVIDADOS_SANDRO" ||
+    categoria === "CONVIDADOS_ALBERTO"
+  ) {
+    return categoria;
   }
 
   return null;
 }
 
-// ==========================================
-// CONTEÚDO DA CATEGORIA
-// ==========================================
-
-async function CategoriaConteudo({ params }: PageProps) {
-  // Apenas administradores podem acessar.
+async function CategoriaConteudo({
+  params,
+}: PageProps) {
   await requireRole("ADMIN");
 
   const { categoria: parametro } = await params;
-
   const categoria = obterCategoria(parametro);
 
   if (!categoria) {
     notFound();
   }
 
-  const nomeCategoria =
-    categoria === "PRESIDENCIA"
-      ? "Presidência"
-      : "Pista";
-
-  const IconeCategoria =
-    categoria === "PRESIDENCIA"
-      ? Crown
-      : Ticket;
+  const configuracao = categorias[categoria];
+  const nomeCategoria = configuracao.nome;
+  const IconeCategoria = configuracao.icone;
 
   // ==========================================
-  // BUSCAR INGRESSOS E ENTRADAS
+  // BUSCAR INGRESSOS
   // ==========================================
 
   const ingressos =
@@ -119,7 +127,6 @@ async function CategoriaConteudo({ params }: PageProps) {
         codigo: true,
         qrToken: true,
         status: true,
-
         entrada: {
           select: {
             id: true,
@@ -138,7 +145,7 @@ async function CategoriaConteudo({ params }: PageProps) {
     });
 
   // ==========================================
-  // GERAR IMAGENS DOS QR CODES
+  // GERAR QR CODES
   // ==========================================
 
   const ingressosComQR = await Promise.all(
@@ -146,8 +153,8 @@ async function CategoriaConteudo({ params }: PageProps) {
       const qrImage = await QRCode.toDataURL(
         ingresso.qrToken,
         {
-          width: 320,
-          margin: 2,
+          width: 600,
+          margin: 3,
           errorCorrectionLevel: "M",
           color: {
             dark: "#000000",
@@ -181,23 +188,24 @@ async function CategoriaConteudo({ params }: PageProps) {
     (ingresso) => ingresso.status === "CANCELADO"
   ).length;
 
-  // ==========================================
-  // INTERFACE
-  // ==========================================
+  const dadosDownloads = ingressosComQR.map(
+    (ingresso) => ({
+      id: ingresso.id,
+      codigo: ingresso.codigo,
+      numero: ingresso.numero,
+      qrImage: ingresso.qrImage,
+    })
+  );
 
   return (
     <main className="relative min-h-dvh bg-[#080F15] text-white">
       <AutoRefresh intervalo={5000} />
 
-      {/* EFEITO DE FUNDO */}
       <div className="pointer-events-none absolute inset-x-0 top-0 h-80 bg-[radial-gradient(ellipse_at_top,rgba(33,54,61,0.35),transparent_70%)]" />
 
       <div className="relative mx-auto w-full max-w-lg px-4 pb-8 pt-5">
 
-        {/* ======================================
-            HEADER PADRÃO
-        ====================================== */}
-
+        {/* CABEÇALHO */}
         <header className="mb-5 flex items-center gap-3">
           <div className="relative h-11 w-11 shrink-0">
             <Image
@@ -226,7 +234,6 @@ async function CategoriaConteudo({ params }: PageProps) {
         </header>
 
         {/* VOLTAR */}
-
         <Link
           href="/admin/ingressos-individuais"
           className="mb-5 inline-flex items-center gap-2 text-xs font-semibold text-[#F4C75D] transition hover:text-[#FFE08A]"
@@ -235,10 +242,7 @@ async function CategoriaConteudo({ params }: PageProps) {
           Voltar para categorias
         </Link>
 
-        {/* ======================================
-            IDENTIFICAÇÃO DA CATEGORIA
-        ====================================== */}
-
+        {/* IDENTIFICAÇÃO DA CATEGORIA */}
         <section className="mb-6 rounded-2xl border border-[#F4C75D]/20 bg-gradient-to-br from-[#25251D] to-[#141D25] p-5">
           <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-xl border border-[#F4C75D]/20 bg-[#F4C75D]/10">
             <IconeCategoria
@@ -273,12 +277,8 @@ async function CategoriaConteudo({ params }: PageProps) {
           </div>
         </section>
 
-        {/* ======================================
-            ESTATÍSTICAS
-        ====================================== */}
-
-        <section className="mb-7 grid grid-cols-2 gap-3">
-          {/* TOTAL */}
+        {/* ESTATÍSTICAS */}
+        <section className="mb-6 grid grid-cols-2 gap-3">
 
           <div className="rounded-2xl border border-[#F4C75D]/20 bg-[#211C12] p-4">
             <Ticket
@@ -295,8 +295,6 @@ async function CategoriaConteudo({ params }: PageProps) {
             </p>
           </div>
 
-          {/* DISPONÍVEIS */}
-
           <div className="rounded-2xl border border-emerald-500/20 bg-[#0A1E1B] p-4">
             <Clock3
               size={20}
@@ -312,8 +310,6 @@ async function CategoriaConteudo({ params }: PageProps) {
             </p>
           </div>
 
-          {/* UTILIZADOS */}
-
           <div className="rounded-2xl border border-blue-500/20 bg-[#101D2A] p-4">
             <CheckCircle2
               size={20}
@@ -328,8 +324,6 @@ async function CategoriaConteudo({ params }: PageProps) {
               Utilizados
             </p>
           </div>
-
-          {/* CANCELADOS */}
 
           <div className="rounded-2xl border border-red-500/20 bg-[#211215] p-4">
             <XCircle
@@ -348,9 +342,45 @@ async function CategoriaConteudo({ params }: PageProps) {
         </section>
 
         {/* ======================================
-            TÍTULO DOS QR CODES
+            BAIXAR TODOS EM ZIP
         ====================================== */}
 
+        <section className="mb-7 rounded-2xl border border-[#F4C75D]/30 bg-gradient-to-br from-[#2D2517] to-[#141D25] p-4">
+          <div className="mb-4 flex items-start gap-3">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#F4C75D]/10">
+              <FileArchive
+                size={23}
+                className="text-[#F4C75D]"
+              />
+            </div>
+
+            <div className="min-w-0">
+              <h3 className="text-sm font-extrabold">
+                Download de todos os ingressos
+              </h3>
+
+              <p className="mt-1 text-[11px] leading-relaxed text-white/50">
+                Baixe os {totalIngressos} ingressos de{" "}
+                {nomeCategoria} em um único arquivo ZIP.
+              </p>
+            </div>
+          </div>
+
+          <DownloadsIngressos
+            categoria={categoria}
+            ingressos={dadosDownloads}
+            modo="todos"
+          />
+
+          <p className="mt-3 text-center text-[10px] text-white/40">
+            {categoria === "CONVIDADOS_SANDRO" ||
+            categoria === "CONVIDADOS_ALBERTO"
+              ? "Todos os PNGs serão gerados com a arte oficial do festival."
+              : "Todos os QR Codes serão reunidos em um único ZIP."}
+          </p>
+        </section>
+
+        {/* TÍTULO DOS QR CODES */}
         <div className="mb-4 flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <QrCode
@@ -369,7 +399,6 @@ async function CategoriaConteudo({ params }: PageProps) {
         </div>
 
         {/* LISTA VAZIA */}
-
         {totalIngressos === 0 && (
           <div className="rounded-2xl border border-white/10 bg-[#141D25] p-8 text-center">
             <p className="text-sm text-white/50">
@@ -378,10 +407,7 @@ async function CategoriaConteudo({ params }: PageProps) {
           </div>
         )}
 
-        {/* ======================================
-            LISTA DE INGRESSOS
-        ====================================== */}
-
+        {/* LISTAGEM */}
         <section className="grid gap-4 sm:grid-cols-2">
           {ingressosComQR.map((ingresso) => {
             const utilizado =
@@ -392,7 +418,7 @@ async function CategoriaConteudo({ params }: PageProps) {
 
             const numeroFormatado = String(
               ingresso.numero
-            ).padStart(2, "0");
+            ).padStart(3, "0");
 
             const entrada = ingresso.entrada;
 
@@ -401,8 +427,8 @@ async function CategoriaConteudo({ params }: PageProps) {
                 key={ingresso.id}
                 className="overflow-hidden rounded-2xl border border-white/[0.08] bg-[#141D25]"
               >
-                {/* CABEÇALHO DO INGRESSO */}
 
+                {/* CABEÇALHO DO INGRESSO */}
                 <div className="flex items-center justify-between gap-2 border-b border-white/[0.08] px-4 py-3">
                   <h3 className="text-sm font-bold">
                     Ingresso #{numeroFormatado}
@@ -428,7 +454,6 @@ async function CategoriaConteudo({ params }: PageProps) {
                 <div className="p-4">
 
                   {/* QR CODE */}
-
                   <div className="mx-auto mb-4 max-w-[250px] rounded-xl bg-white p-3">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
@@ -439,7 +464,6 @@ async function CategoriaConteudo({ params }: PageProps) {
                   </div>
 
                   {/* IDENTIFICAÇÃO */}
-
                   <p className="truncate text-center text-sm font-semibold">
                     {nomeCategoria}
                   </p>
@@ -448,16 +472,11 @@ async function CategoriaConteudo({ params }: PageProps) {
                     Ingresso #{numeroFormatado}
                   </p>
 
-                  {/* CÓDIGO */}
-
                   <p className="mt-1 break-all text-center text-[10px] text-white/30">
                     {ingresso.codigo}
                   </p>
 
-                  {/* ==================================
-                      ENTRADA REGISTRADA
-                  ================================== */}
-
+                  {/* HISTÓRICO DA ENTRADA */}
                   {entrada ? (
                     <div className="mt-5 overflow-hidden rounded-xl border border-emerald-500/20 bg-[#0C2520]">
                       <div className="flex items-center gap-2 border-b border-emerald-500/15 px-3 py-3">
@@ -474,7 +493,6 @@ async function CategoriaConteudo({ params }: PageProps) {
                       <div className="space-y-3 p-3">
 
                         {/* PARTICIPANTE */}
-
                         <div className="flex items-start gap-2.5">
                           <UserRound
                             size={16}
@@ -494,7 +512,6 @@ async function CategoriaConteudo({ params }: PageProps) {
                         </div>
 
                         {/* FUNCIONÁRIO */}
-
                         <div className="flex items-start gap-2.5">
                           <ShieldCheck
                             size={16}
@@ -515,8 +532,8 @@ async function CategoriaConteudo({ params }: PageProps) {
                         </div>
 
                         {/* DATA E HORÁRIO */}
-
                         <div className="grid grid-cols-2 gap-3 border-t border-emerald-500/15 pt-3">
+
                           <div className="flex items-start gap-2">
                             <CalendarDays
                               size={15}
@@ -529,7 +546,9 @@ async function CategoriaConteudo({ params }: PageProps) {
                               </p>
 
                               <p className="mt-0.5 text-xs font-semibold">
-                                {formatarData(entrada.horario)}
+                                {formatarData(
+                                  entrada.horario
+                                )}
                               </p>
                             </div>
                           </div>
@@ -546,7 +565,9 @@ async function CategoriaConteudo({ params }: PageProps) {
                               </p>
 
                               <p className="mt-0.5 text-xs font-semibold">
-                                {formatarHorario(entrada.horario)}
+                                {formatarHorario(
+                                  entrada.horario
+                                )}
                               </p>
                             </div>
                           </div>
@@ -566,18 +587,19 @@ async function CategoriaConteudo({ params }: PageProps) {
                     </div>
                   )}
 
-                  {/* ==================================
-                      BAIXAR QR CODE
-                  ================================== */}
-
-                  <a
-                    href={ingresso.qrImage}
-                    download={`QR-${ingresso.codigo}.png`}
-                    className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#DCA53D] to-[#FFE08A] px-4 py-3 text-sm font-bold text-[#231A0A] transition hover:brightness-110"
-                  >
-                    <Download size={17} />
-                    Baixar QR Code
-                  </a>
+                  {/* DOWNLOAD INDIVIDUAL */}
+                  <DownloadsIngressos
+                    categoria={categoria}
+                    ingressos={[
+                      {
+                        id: ingresso.id,
+                        codigo: ingresso.codigo,
+                        numero: ingresso.numero,
+                        qrImage: ingresso.qrImage,
+                      },
+                    ]}
+                    modo="individual"
+                  />
 
                 </div>
               </article>
@@ -586,7 +608,6 @@ async function CategoriaConteudo({ params }: PageProps) {
         </section>
 
         {/* RODAPÉ */}
-
         <p className="mt-7 text-center text-[10px] text-white/30">
           G.R.E.S. Guardiões da Capadócia
         </p>
@@ -594,10 +615,6 @@ async function CategoriaConteudo({ params }: PageProps) {
     </main>
   );
 }
-
-// ==========================================
-// CARREGAMENTO
-// ==========================================
 
 function CategoriaLoading() {
   return (
@@ -612,10 +629,6 @@ function CategoriaLoading() {
     </main>
   );
 }
-
-// ==========================================
-// PÁGINA PRINCIPAL
-// ==========================================
 
 export default function CategoriaPage({
   params,

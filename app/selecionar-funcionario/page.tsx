@@ -1,10 +1,9 @@
 
 /* eslint-disable react-hooks/set-state-in-effect */
-
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import {
   Users,
   UserRound,
@@ -21,6 +20,7 @@ const FUNCIONARIOS = [1, 2, 3] as const;
 
 export default function SelecionarFuncionarioPage() {
   const router = useRouter();
+  const pathname = usePathname();
 
   const [funcionario, setFuncionario] =
     useState<Funcionario | null>(null);
@@ -30,18 +30,49 @@ export default function SelecionarFuncionarioPage() {
   const [erro, setErro] = useState("");
 
   // ==========================================
-  // RECUPERAR FUNCIONÁRIO SELECIONADO
+  // RECUPERAR FUNCIONÁRIO E REINICIAR ESTADOS
   // ==========================================
 
   useEffect(() => {
-    const salvo = sessionStorage.getItem(
-      "funcionarioSelecionado"
-    );
+    function restaurarPagina() {
+      const salvo = sessionStorage.getItem(
+        "funcionarioSelecionado"
+      );
 
-    if (salvo === "1" || salvo === "2" || salvo === "3") {
-      setFuncionario(Number(salvo) as Funcionario);
+      if (
+        salvo === "1" ||
+        salvo === "2" ||
+        salvo === "3"
+      ) {
+        setFuncionario(Number(salvo) as Funcionario);
+      }
+
+      setCarregando(false);
+      setSaindo(false);
     }
+
+    restaurarPagina();
+
+    // Restauração pelo histórico do navegador.
+    window.addEventListener("pageshow", restaurarPagina);
+
+    return () => {
+      window.removeEventListener(
+        "pageshow",
+        restaurarPagina
+      );
+    };
   }, []);
+
+  // ==========================================
+  // CORRIGIR ESTADO AO VOLTAR PELO NEXT.JS
+  // ==========================================
+
+  useEffect(() => {
+    if (pathname === "/selecionar-funcionario") {
+      setCarregando(false);
+    }
+  }, [pathname]);
 
   // ==========================================
   // CONTINUAR PARA CREDENCIAMENTO
@@ -50,12 +81,14 @@ export default function SelecionarFuncionarioPage() {
   function continuar() {
     if (!funcionario || carregando || saindo) return;
 
-    setCarregando(true);
+    setErro("");
 
     sessionStorage.setItem(
       "funcionarioSelecionado",
       String(funcionario)
     );
+
+    setCarregando(true);
 
     router.push("/credenciamento");
   }
@@ -92,13 +125,13 @@ export default function SelecionarFuncionarioPage() {
     }
   }
 
+  // ==========================================
+  // INTERFACE
+  // ==========================================
+
   return (
     <main className="relative flex h-dvh w-full items-center justify-center overflow-x-hidden overflow-y-auto bg-black px-4 py-3 text-white">
-
-      {/* =====================================
-          IMAGEM ORIGINAL COMO FUNDO
-      ===================================== */}
-
+      {/* IMAGEM ORIGINAL COMO FUNDO */}
       <div
         aria-hidden="true"
         className="pointer-events-none fixed inset-0 bg-cover bg-center bg-no-repeat"
@@ -119,18 +152,10 @@ export default function SelecionarFuncionarioPage() {
         className="pointer-events-none fixed inset-0 bg-gradient-to-b from-black/15 via-transparent to-black/45"
       />
 
-      {/* =====================================
-          CONTEÚDO CENTRAL
-      ===================================== */}
-
+      {/* CONTEÚDO CENTRAL */}
       <div className="relative z-10 my-auto w-full max-w-[390px] py-2">
-
-        {/* =====================================
-            CARD DE VIDRO
-        ===================================== */}
-
+        {/* CARD DE VIDRO */}
         <section className="relative overflow-hidden rounded-[28px] border border-white/30 bg-black/30 p-5 shadow-[0_20px_80px_rgba(0,0,0,0.45)] backdrop-blur-xl sm:p-7">
-
           {/* REFLEXO SUPERIOR */}
           <div
             aria-hidden="true"
@@ -144,13 +169,8 @@ export default function SelecionarFuncionarioPage() {
           />
 
           <div className="relative z-10">
-
-            {/* =====================================
-                CABEÇALHO
-            ===================================== */}
-
+            {/* CABEÇALHO */}
             <header className="mb-5 text-center">
-
               <div className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-2xl border border-white/25 bg-white/10 shadow-inner backdrop-blur-md">
                 <Users
                   size={22}
@@ -172,10 +192,7 @@ export default function SelecionarFuncionarioPage() {
               </p>
             </header>
 
-            {/* =====================================
-                SELEÇÃO DOS FUNCIONÁRIOS
-            ===================================== */}
-
+            {/* SELEÇÃO DOS FUNCIONÁRIOS */}
             <div className="space-y-2.5">
               {FUNCIONARIOS.map((numero) => {
                 const selecionado =
@@ -197,7 +214,6 @@ export default function SelecionarFuncionarioPage() {
                         : "border-white/25 bg-white/10 hover:border-white/40 hover:bg-white/15"
                     }`}
                   >
-
                     {/* ÍCONE */}
                     <div
                       className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border transition ${
@@ -249,10 +265,7 @@ export default function SelecionarFuncionarioPage() {
               })}
             </div>
 
-            {/* =====================================
-                ERRO
-            ===================================== */}
-
+            {/* ERRO */}
             {erro && (
               <div
                 role="alert"
@@ -262,10 +275,7 @@ export default function SelecionarFuncionarioPage() {
               </div>
             )}
 
-            {/* =====================================
-                BOTÃO CONTINUAR
-            ===================================== */}
-
+            {/* BOTÃO CONTINUAR */}
             <button
               type="button"
               onClick={continuar}
@@ -292,10 +302,7 @@ export default function SelecionarFuncionarioPage() {
               )}
             </button>
 
-            {/* =====================================
-                SAIR DA CONTA
-            ===================================== */}
-
+            {/* SAIR DA CONTA */}
             <button
               type="button"
               onClick={sair}
@@ -317,20 +324,15 @@ export default function SelecionarFuncionarioPage() {
                 </>
               )}
             </button>
-
           </div>
         </section>
 
-        {/* =====================================
-            RODAPÉ
-        ===================================== */}
-
+        {/* RODAPÉ */}
         <footer className="mt-4 flex items-center justify-center gap-2 px-2 text-center text-[10px] text-white/85 drop-shadow-md">
           <ShieldCheck size={13} />
           Sua identificação será registrada em cada
           credenciamento.
         </footer>
-
       </div>
     </main>
   );

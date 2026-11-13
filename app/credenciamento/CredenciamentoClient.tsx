@@ -1,5 +1,8 @@
+
 /* eslint-disable react-hooks/set-state-in-effect */
+
 "use client";
+
 import {
   useCallback,
   useEffect,
@@ -30,14 +33,17 @@ import {
   X,
   XCircle,
 } from "lucide-react";
+
 // ==========================================
 // TIPOS
 // ==========================================
+
 type UltimaEntrada = {
   nome: string;
   sobrenome: string;
   horario: string;
 };
+
 type Ingresso = {
   id: string;
   codigo: string;
@@ -48,16 +54,21 @@ type Ingresso = {
     | "PISTA"
     | "CONVIDADOS_SANDRO"
     | "CONVIDADOS_ALBERTO"
+    | "CORTE_RIO_CARNAVAL_2026"
     | "IMPRENSA"
     | null;
   numero?: number;
   nomeCategoria?: string;
   permiteAcompanhantes?: boolean;
+  nomeTitular?: string | null;
+  cargo?: string | null;
+  tipoAcesso?: string | null;
   escola: {
     nome: string;
   };
   ultimaEntrada?: UltimaEntrada | null;
 };
+
 type Tela =
   | "scanner"
   | "formulario"
@@ -65,24 +76,38 @@ type Tela =
   | "cancelado"
   | "liberacao"
   | "sucesso";
+
 // ==========================================
 // ESTILOS
 // ==========================================
+
 const BOTAO_DOURADO =
   "flex min-h-[52px] w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-b from-[#FFE18A] via-[#F2C65C] to-[#DDA73F] px-4 py-3 text-sm font-bold text-[#261A08] shadow-[0_6px_22px_rgba(225,174,65,0.17)] transition hover:brightness-110 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50";
+
 const BOTAO_SECUNDARIO =
   "flex min-h-[49px] w-full items-center justify-center gap-2 rounded-xl border border-white/20 bg-[#141C24]/90 px-4 py-3 text-sm font-medium text-white/90 transition hover:bg-[#1D2933] disabled:opacity-50";
+
 const CAMPO =
   "h-[51px] w-full rounded-xl border border-white/15 bg-[#151E26] px-4 text-base text-white outline-none transition placeholder:text-white/35 focus:border-[#E7BE69] focus:ring-2 focus:ring-[#E7BE69]/15";
+
 // ==========================================
-// IDENTIFICAÇÃO DO INGRESSO
+// IDENTIFICAÇÃO DOS INGRESSOS
 // ==========================================
+
 function ehUsoUnico(ingresso: Ingresso | null) {
   return (
     ingresso?.tipo === "INDIVIDUAL" ||
     ingresso?.tipo === "IMPRENSA"
   );
 }
+
+function ehIngressoCorte(ingresso: Ingresso | null) {
+  return (
+    ingresso?.tipo === "INDIVIDUAL" &&
+    ingresso.categoria === "CORTE_RIO_CARNAVAL_2026"
+  );
+}
+
 function nomeDoIngresso(ingresso: Ingresso) {
   if (ingresso.tipo === "INDIVIDUAL") {
     switch (ingresso.categoria) {
@@ -94,19 +119,32 @@ function nomeDoIngresso(ingresso: Ingresso) {
         return "Convidados Sandro";
       case "CONVIDADOS_ALBERTO":
         return "Convidados Alberto";
+      case "CORTE_RIO_CARNAVAL_2026":
+        return "Corte do Rio Carnaval 2026";
       default:
-        return ingresso.nomeCategoria || ingresso.escola.nome;
+        return (
+          ingresso.nomeCategoria ||
+          ingresso.escola?.nome ||
+          "Ingresso individual"
+        );
     }
   }
+
   if (ingresso.tipo === "IMPRENSA") {
-    return ingresso.nomeCategoria || ingresso.escola.nome;
+    return (
+      ingresso.nomeCategoria ||
+      ingresso.escola?.nome ||
+      "Imprensa"
+    );
   }
-  return ingresso.escola.nome;
+
+  return ingresso.escola?.nome || "Ingresso";
 }
 
 // ==========================================
 // CARTÃO DO INGRESSO
 // ==========================================
+
 function CartaoIngresso({
   ingresso,
   vermelho = false,
@@ -114,8 +152,10 @@ function CartaoIngresso({
   ingresso: Ingresso;
   vermelho?: boolean;
 }) {
-  const imprensa = ingresso.tipo === "IMPRENSA";
   const usoUnico = ehUsoUnico(ingresso);
+  const imprensa = ingresso.tipo === "IMPRENSA";
+  const corte = ehIngressoCorte(ingresso);
+
   return (
     <div
       className={`flex items-center gap-3 rounded-2xl border p-3.5 text-left ${
@@ -126,10 +166,7 @@ function CartaoIngresso({
     >
       <div className="relative flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-white/15 bg-white/10 p-1">
         {usoUnico ? (
-          <Ticket
-            size={25}
-            className="text-[#F4C75D]"
-          />
+          <Ticket size={25} className="text-[#F4C75D]" />
         ) : (
           <Image
             src="/logonova.png"
@@ -140,20 +177,44 @@ function CartaoIngresso({
           />
         )}
       </div>
+
       <div className="min-w-0 flex-1">
         {usoUnico && (
           <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-[#F4C75D]">
-            {imprensa
-              ? "Ingresso imprensa"
-              : "Ingresso individual"}
+            {corte
+              ? "Ingresso da Corte"
+              : imprensa
+                ? "Ingresso imprensa"
+                : "Ingresso individual"}
           </p>
         )}
+
         <p className="truncate text-sm font-semibold text-white">
           {nomeDoIngresso(ingresso)}
         </p>
+
+        {corte && ingresso.nomeTitular && (
+          <p className="mt-1 text-sm font-semibold text-[#F4C75D]">
+            {ingresso.nomeTitular}
+          </p>
+        )}
+
+        {corte && ingresso.cargo && (
+          <p className="mt-1 text-xs text-white/70">
+            {ingresso.cargo}
+          </p>
+        )}
+
+        {corte && (
+          <p className="mt-1 text-xs font-bold text-[#F4C75D]">
+            {ingresso.tipoAcesso || "CAMAROTE"}
+          </p>
+        )}
+
         <p className="mt-1 text-xs text-white/50">
           {ingresso.codigo}
         </p>
+
         {usoUnico && (
           <p className="mt-1 text-[11px] text-white/50">
             1 entrada · Sem acompanhantes
@@ -163,15 +224,18 @@ function CartaoIngresso({
     </div>
   );
 }
+
 // ==========================================
 // CARTÃO DA ÚLTIMA ENTRADA
 // ==========================================
+
 function CartaoUltimaEntrada({
   entrada,
 }: {
   entrada: UltimaEntrada;
 }) {
   const data = new Date(entrada.horario);
+
   const horarioFormatado = Number.isNaN(data.getTime())
     ? "Horário não disponível"
     : new Intl.DateTimeFormat("pt-BR", {
@@ -182,21 +246,26 @@ function CartaoUltimaEntrada({
         hour: "2-digit",
         minute: "2-digit",
       }).format(data);
+
   return (
     <div className="mt-4 rounded-2xl border border-red-400/20 bg-[#2B1519]/80 p-5 text-left">
       <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-red-300/75">
         Participante que utilizou o ingresso
       </p>
+
       <p className="mt-3 break-words text-xl font-bold text-white">
         {entrada.nome} {entrada.sobrenome}
       </p>
+
       <div className="mt-4 border-t border-white/10 pt-3">
         <p className="text-xs text-white/45">
           Data e horário da entrada
         </p>
+
         <p className="mt-1 text-sm font-semibold text-white/80">
           {horarioFormatado}
         </p>
+
         <p className="mt-1 text-[11px] text-white/40">
           Horário de Brasília
         </p>
@@ -204,9 +273,11 @@ function CartaoUltimaEntrada({
     </div>
   );
 }
+
 // ==========================================
 // MOLDURA DO SCANNER
 // ==========================================
+
 function MolduraScanner({
   ativa = false,
 }: {
@@ -221,93 +292,134 @@ function MolduraScanner({
       <span className="absolute right-0 top-0 h-9 w-9 rounded-tr-2xl border-r-[3px] border-t-[3px] border-[#F7CF67]" />
       <span className="absolute bottom-0 left-0 h-9 w-9 rounded-bl-2xl border-b-[3px] border-l-[3px] border-[#F7CF67]" />
       <span className="absolute bottom-0 right-0 h-9 w-9 rounded-br-2xl border-b-[3px] border-r-[3px] border-[#F7CF67]" />
+
       {ativa && (
         <div className="absolute inset-x-5 top-1/2 h-px animate-pulse bg-[#F7CF67]/70 shadow-[0_0_14px_3px_rgba(247,207,103,0.35)]" />
       )}
     </div>
   );
 }
+
 // ==========================================
 // COMPONENTE PRINCIPAL
 // ==========================================
+
 export default function CredenciamentoClient() {
   const router = useRouter();
+
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const processandoRef = useRef(false);
   const iniciandoCameraRef = useRef(false);
   const enviandoRef = useRef(false);
   const montadoRef = useRef(false);
+
   const [funcionario, setFuncionario] = useState("");
   const [tela, setTela] = useState<Tela>("scanner");
+
   const [cameraAtiva, setCameraAtiva] = useState(false);
   const [iniciandoCamera, setIniciandoCamera] =
     useState(false);
+
   const [carregando, setCarregando] = useState(false);
   const [saindo, setSaindo] = useState(false);
+
   const [lanternaAtiva, setLanternaAtiva] =
     useState(false);
+
   const [lanternaDisponivel, setLanternaDisponivel] =
     useState(false);
+
   const [ingresso, setIngresso] =
     useState<Ingresso | null>(null);
+
   const [qrToken, setQrToken] = useState("");
   const [nome, setNome] = useState("");
   const [sobrenome, setSobrenome] = useState("");
+
   const [motivo, setMotivo] = useState("");
   const [pinGerente, setPinGerente] = useState("");
   const [mostrarPin, setMostrarPin] = useState(false);
+
   const [erro, setErro] = useState("");
   const [mensagem, setMensagem] = useState("");
-  const [tentativasRestantes, setTentativasRestantes] =
-    useState<number | null>(null);
+
+  const [
+    tentativasRestantes,
+    setTentativasRestantes,
+  ] = useState<number | null>(null);
+
   const [bloqueadoAte, setBloqueadoAte] =
     useState<string | null>(null);
-  // ==========================================*
-  // IDENTIFICAR FUNCIONÁRIO*
-  // ==========================================*
+
+  // ==========================================
+  // IDENTIFICAÇÃO DA CORTE
+  // ==========================================
+
+  const ingressoCorte = ehIngressoCorte(ingresso);
+
+  const titularCorte = ingressoCorte
+    ? ingresso?.nomeTitular?.trim() || ""
+    : "";
+
+  // ==========================================
+  // IDENTIFICAR FUNCIONÁRIO
+  // ==========================================
+
   useEffect(() => {
     montadoRef.current = true;
+
     const salvo = sessionStorage.getItem(
       "funcionarioSelecionado"
     );
+
     if (!salvo || !["1", "2", "3"].includes(salvo)) {
       router.replace("/selecionar-funcionario");
     } else {
       setFuncionario(salvo);
     }
+
     return () => {
       montadoRef.current = false;
+
       const scanner = scannerRef.current;
       scannerRef.current = null;
+
       if (scanner?.isScanning) {
         void scanner.stop().catch(() => {});
       }
     };
   }, [router]);
-  // ==========================================*
-  // PARAR CÂMERA*
-  // ==========================================*
+
+  // ==========================================
+  // PARAR CÂMERA
+  // ==========================================
+
   const pararCamera = useCallback(async () => {
     const scanner = scannerRef.current;
+
     if (scanner?.isScanning) {
       try {
         await scanner.stop();
       } catch {
-        // Câmera já encerrada.*
+        // Câmera já encerrada.
       }
     }
+
     if (scannerRef.current === scanner) {
       scannerRef.current = null;
     }
+
     if (montadoRef.current) {
       setCameraAtiva(false);
       setLanternaAtiva(false);
       setLanternaDisponivel(false);
     }
   }, []);
-  // ==========================================*
-  // LIMPAR DADOS*
-  // ==========================================*
+
+  // ==========================================
+  // LIMPAR DADOS
+  // ==========================================
+
   function limparDados() {
     setIngresso(null);
     setQrToken("");
@@ -321,18 +433,24 @@ export default function CredenciamentoClient() {
     setTentativasRestantes(null);
     setBloqueadoAte(null);
   }
-  // ==========================================*
-  // NOVO CREDENCIAMENTO*
-  // ==========================================*
+
+  // ==========================================
+  // NOVO CREDENCIAMENTO
+  // ==========================================
+
   async function novoCredenciamento() {
     await pararCamera();
+
     limparDados();
+
     processandoRef.current = false;
     setTela("scanner");
   }
-  // ==========================================*
-  // VALIDAR QR CODE*
-  // ==========================================*
+
+  // ==========================================
+  // VALIDAR QR CODE
+  // ==========================================
+
   const validarQRCode = useCallback(
     async (token: string) => {
       if (
@@ -342,12 +460,15 @@ export default function CredenciamentoClient() {
       ) {
         return;
       }
+
       processandoRef.current = true;
       setCarregando(true);
       setErro("");
       setMensagem("");
+
       try {
         await pararCamera();
+
         const resposta = await fetch(
           "/api/credenciamento/validar",
           {
@@ -362,7 +483,9 @@ export default function CredenciamentoClient() {
             }),
           }
         );
+
         const dados = await resposta.json();
+
         if (!resposta.ok) {
           setErro(
             dados.mensagem ||
@@ -370,20 +493,25 @@ export default function CredenciamentoClient() {
           );
           return;
         }
+
         setQrToken(token);
         setIngresso(dados.ingresso);
+
         if (dados.status === "UTILIZADO") {
           setTela("bloqueado");
           return;
         }
+
         if (dados.status === "CANCELADO") {
           setTela("cancelado");
           return;
         }
+
         if (dados.status !== "DISPONIVEL") {
           setErro("Ingresso indisponível.");
           return;
         }
+
         setTela("formulario");
       } catch {
         setErro(
@@ -393,14 +521,17 @@ export default function CredenciamentoClient() {
         if (montadoRef.current) {
           setCarregando(false);
         }
+
         processandoRef.current = false;
       }
     },
     [pararCamera]
   );
-  // ==========================================*
-  // INICIAR CÂMERA*
-  // ==========================================*
+
+  // ==========================================
+  // INICIAR CÂMERA
+  // ==========================================
+
   async function iniciarCamera() {
     if (
       cameraAtiva ||
@@ -411,10 +542,13 @@ export default function CredenciamentoClient() {
     ) {
       return;
     }
+
     iniciandoCameraRef.current = true;
     setIniciandoCamera(true);
+
     limparDados();
     setTela("scanner");
+
     try {
       const scanner = new Html5Qrcode(
         "leitor-qr",
@@ -422,7 +556,9 @@ export default function CredenciamentoClient() {
           verbose: false,
         }
       );
+
       scannerRef.current = scanner;
+
       await scanner.start(
         { facingMode: "environment" },
         {
@@ -433,6 +569,7 @@ export default function CredenciamentoClient() {
               altura * 0.75,
               250
             );
+
             return {
               width: Math.max(
                 100,
@@ -452,6 +589,7 @@ export default function CredenciamentoClient() {
         },
         () => {}
       );
+
       if (
         processandoRef.current ||
         !montadoRef.current
@@ -459,14 +597,17 @@ export default function CredenciamentoClient() {
         if (scanner.isScanning) {
           await scanner.stop().catch(() => {});
         }
+
         if (scannerRef.current === scanner) {
           scannerRef.current = null;
         }
       } else {
         setCameraAtiva(true);
+
         try {
           const recursos =
             scanner.getRunningTrackCapabilities();
+
           setLanternaDisponivel(
             Boolean(
               recursos &&
@@ -482,6 +623,7 @@ export default function CredenciamentoClient() {
       setErro(
         "Não foi possível abrir a câmera. Verifique as permissões."
       );
+
       setCameraAtiva(false);
       scannerRef.current = null;
     } finally {
@@ -489,19 +631,24 @@ export default function CredenciamentoClient() {
       setIniciandoCamera(false);
     }
   }
-  // ==========================================*
-  // LANTERNA*
-  // ==========================================*
+
+  // ==========================================
+  // LANTERNA
+  // ==========================================
+
   async function alternarLanterna() {
     const scanner = scannerRef.current;
+
     if (
       !scanner?.isScanning ||
       !lanternaDisponivel
     ) {
       return;
     }
+
     try {
       const novoEstado = !lanternaAtiva;
+
       await scanner.applyVideoConstraints({
         advanced: [
           {
@@ -509,6 +656,7 @@ export default function CredenciamentoClient() {
           } as MediaTrackConstraintSet,
         ],
       });
+
       setLanternaAtiva(novoEstado);
     } catch {
       setErro(
@@ -516,25 +664,53 @@ export default function CredenciamentoClient() {
       );
     }
   }
-  // ==========================================*
-  // CONFIRMAR ENTRADA*
-  // ==========================================*
+
+  // ==========================================
+  // CONFIRMAR ENTRADA
+  // CORTE COM TITULAR AUTOMÁTICO
+  // ==========================================
+
   async function confirmarEntrada(
     e: FormEvent<HTMLFormElement>
   ) {
     e.preventDefault();
+
     if (enviandoRef.current) return;
+
+    if (!qrToken) {
+      setErro("QR Code não identificado.");
+      return;
+    }
+
+    let nomeConfirmacao = nome.trim();
+    let sobrenomeConfirmacao = sobrenome.trim();
+
+    if (ingressoCorte) {
+      if (!titularCorte) {
+        setErro(
+          "O titular deste ingresso não foi identificado. Verifique o cadastro antes de liberar a entrada."
+        );
+        return;
+      }
+
+      const partes = titularCorte.split(/\s+/);
+
+      nomeConfirmacao = partes.shift() || "";
+      sobrenomeConfirmacao = partes.join(" ");
+    }
+
     if (
-      !qrToken ||
-      !nome.trim() ||
-      !sobrenome.trim()
+      !nomeConfirmacao ||
+      !sobrenomeConfirmacao
     ) {
       setErro("Preencha nome e sobrenome.");
       return;
     }
+
     enviandoRef.current = true;
     setCarregando(true);
     setErro("");
+
     try {
       const resposta = await fetch(
         "/api/credenciamento/confirmar",
@@ -547,13 +723,15 @@ export default function CredenciamentoClient() {
           cache: "no-store",
           body: JSON.stringify({
             qrToken,
-            nome: nome.trim(),
-            sobrenome: sobrenome.trim(),
+            nome: nomeConfirmacao,
+            sobrenome: sobrenomeConfirmacao,
             funcionarioNumero: Number(funcionario),
           }),
         }
       );
+
       const dados = await resposta.json();
+
       if (!resposta.ok) {
         if (resposta.status === 409) {
           const novaConsulta = await fetch(
@@ -568,27 +746,39 @@ export default function CredenciamentoClient() {
               body: JSON.stringify({ qrToken }),
             }
           )
-            .then((r) => (r.ok ? r.json() : null))
+            .then((r) =>
+              r.ok ? r.json() : null
+            )
             .catch(() => null);
+
           if (novaConsulta?.sucesso) {
             setIngresso(novaConsulta.ingresso);
-            if (novaConsulta.status === "UTILIZADO") {
+
+            if (
+              novaConsulta.status === "UTILIZADO"
+            ) {
               setTela("bloqueado");
             }
-            if (novaConsulta.status === "CANCELADO") {
+
+            if (
+              novaConsulta.status === "CANCELADO"
+            ) {
               setTela("cancelado");
             }
           }
         }
+
         setErro(
           dados.mensagem ||
             "Não foi possível confirmar a entrada."
         );
         return;
       }
+
       setMensagem(
         "O ingresso foi registrado como utilizado."
       );
+
       setTela("sucesso");
     } catch {
       setErro(
@@ -599,22 +789,29 @@ export default function CredenciamentoClient() {
       setCarregando(false);
     }
   }
-  // ==========================================*
-  // LIBERAÇÃO GERENCIAL*
-  // APENAS INGRESSOS DE ESCOLAS*
-  // ==========================================*
+
+  // ==========================================
+  // LIBERAÇÃO GERENCIAL
+  // APENAS INGRESSOS DE ESCOLAS
+  // ==========================================
+
   async function liberarIngresso(
     e: FormEvent<HTMLFormElement>
   ) {
     e.preventDefault();
+
     if (enviandoRef.current) return;
-    // Proteção adicional na interface.*
-    if (!ingresso || ingresso.tipo !== "ESCOLA") {
+
+    if (
+      !ingresso ||
+      ingresso.tipo !== "ESCOLA"
+    ) {
       setErro(
         "A liberação gerencial está disponível apenas para ingressos das escolas."
       );
       return;
     }
+
     if (
       !qrToken ||
       motivo.trim().length < 5 ||
@@ -625,11 +822,13 @@ export default function CredenciamentoClient() {
       );
       return;
     }
+
     enviandoRef.current = true;
     setCarregando(true);
     setErro("");
     setTentativasRestantes(null);
     setBloqueadoAte(null);
+
     try {
       const resposta = await fetch(
         "/api/credenciamento/liberar",
@@ -647,10 +846,13 @@ export default function CredenciamentoClient() {
           }),
         }
       );
+
       const dados = await resposta.json();
+
       if (!resposta.ok) {
         setPinGerente("");
         setMostrarPin(false);
+
         if (
           typeof dados.tentativasRestantes ===
           "number"
@@ -659,25 +861,30 @@ export default function CredenciamentoClient() {
             dados.tentativasRestantes
           );
         }
+
         if (
           typeof dados.bloqueadoAte === "string"
         ) {
           setBloqueadoAte(dados.bloqueadoAte);
         }
+
         setErro(
           dados.mensagem ||
             "Não foi possível liberar o ingresso."
         );
         return;
       }
+
       setPinGerente("");
       setMotivo("");
       setMostrarPin(false);
       setTentativasRestantes(null);
       setBloqueadoAte(null);
+
       setMensagem(
         "Ingresso liberado. Preencha os dados do participante."
       );
+
       setIngresso((atual) =>
         atual
           ? {
@@ -687,6 +894,7 @@ export default function CredenciamentoClient() {
             }
           : atual
       );
+
       setTela("formulario");
     } catch {
       setErro(
@@ -697,20 +905,26 @@ export default function CredenciamentoClient() {
       setCarregando(false);
     }
   }
-  // ==========================================*
-  // TROCAR FUNCIONÁRIO*
-  // ==========================================*
+
+  // ==========================================
+  // TROCAR FUNCIONÁRIO
+  // ==========================================
+
   async function trocarFuncionario() {
     await pararCamera();
     router.push("/selecionar-funcionario");
   }
-  // ==========================================*
-  // SAIR*
-  // ==========================================*
+
+  // ==========================================
+  // SAIR
+  // ==========================================
+
   async function sair() {
     if (saindo) return;
+
     setSaindo(true);
     await pararCamera();
+
     try {
       const resposta = await fetch(
         "/api/auth/logout",
@@ -719,12 +933,15 @@ export default function CredenciamentoClient() {
           credentials: "same-origin",
         }
       );
+
       if (!resposta.ok) {
         throw new Error("Falha ao sair.");
       }
+
       sessionStorage.removeItem(
         "funcionarioSelecionado"
       );
+
       router.replace("/login");
       router.refresh();
     } catch {
@@ -734,24 +951,33 @@ export default function CredenciamentoClient() {
       setSaindo(false);
     }
   }
-  // ==========================================*
-  // ESTADO DA CÂMERA*
-  // ==========================================*
+
+  // ==========================================
+  // ESTADO DA INTERFACE
+  // ==========================================
+
   const cameraAberta =
     tela === "scanner" &&
     (cameraAtiva || iniciandoCamera);
-  const ingressoImprensa = ingresso?.tipo === "IMPRENSA";
-  const ingressoUsoUnico = ehUsoUnico(ingresso);
-  // ==========================================*
-  // INTERFACE*
-  // ==========================================*
+
+  const ingressoImprensa =
+    ingresso?.tipo === "IMPRENSA";
+
+  const ingressoUsoUnico =
+    ehUsoUnico(ingresso);
+
+  // ==========================================
+  // INTERFACE
+  // ==========================================
+
   return (
     <main className="relative flex min-h-dvh w-full flex-col overflow-hidden bg-[#070D12] text-white">
-      {/* FUNDO ESCURO PREMIUM */}
+      {/* FUNDO ESCURO */}
       <div
         aria-hidden="true"
         className="pointer-events-none fixed inset-0 bg-[radial-gradient(ellipse_at_50%_30%,#19272D_0%,#0B141A_48%,#05090D_100%)]"
       />
+
       {/* ILUMINAÇÃO VERDE */}
       {(tela === "sucesso" ||
         tela === "formulario") && (
@@ -760,6 +986,7 @@ export default function CredenciamentoClient() {
           className="pointer-events-none fixed left-1/2 top-[15%] h-72 w-72 -translate-x-1/2 rounded-full bg-emerald-500/[0.07] blur-[95px]"
         />
       )}
+
       {/* ILUMINAÇÃO VERMELHA */}
       {(tela === "bloqueado" ||
         tela === "cancelado") && (
@@ -768,9 +995,11 @@ export default function CredenciamentoClient() {
           className="pointer-events-none fixed left-1/2 top-[12%] h-80 w-80 -translate-x-1/2 rounded-full bg-red-600/[0.16] blur-[100px]"
         />
       )}
-      {/* =====================================*
-*          CABEÇALHO*
-*      ===================================== */}
+
+      {/* =====================================
+          CABEÇALHO
+      ===================================== */}
+
       <header className="relative z-20 shrink-0 border-b border-white/[0.07] bg-black/25 backdrop-blur-xl">
         <div className="mx-auto flex h-[62px] w-full max-w-lg items-center justify-between px-4">
           <div className="flex min-w-0 items-center gap-2.5">
@@ -797,15 +1026,18 @@ export default function CredenciamentoClient() {
                 />
               </div>
             )}
+
             <div className="min-w-0">
               <p className="truncate text-[13px] font-semibold">
                 Funcionário {funcionario || "..."}
               </p>
+
               <p className="text-[10px] text-white/40">
                 Credenciamento
               </p>
             </div>
           </div>
+
           <div className="flex items-center gap-3">
             <button
               type="button"
@@ -815,6 +1047,7 @@ export default function CredenciamentoClient() {
             >
               Trocar
             </button>
+
             <button
               type="button"
               onClick={sair}
@@ -834,11 +1067,14 @@ export default function CredenciamentoClient() {
           </div>
         </div>
       </header>
-      {/* =====================================*
-*          CONTEÚDO*
-*      ===================================== */}
+
+      {/* =====================================
+          CONTEÚDO
+      ===================================== */}
+
       <div className="relative z-10 mx-auto flex w-full max-w-lg flex-1 flex-col px-4 py-5">
         {/* LEITOR REAL — MANTIDO MONTADO */}
+
         <div
           className={
             cameraAberta
@@ -851,39 +1087,44 @@ export default function CredenciamentoClient() {
               id="leitor-qr"
               className="h-full w-full overflow-hidden [&_video]:!h-full [&_video]:!w-full [&_video]:!object-cover [&_img]:hidden"
             />
-            {/* MOLDURA SOBRE A CÂMERA */}
+
+            {/* MOLDURA */}
             <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
               <div className="relative aspect-square w-[70%] max-w-[270px]">
                 <MolduraScanner ativa />
               </div>
             </div>
-            {/* DEGRADÊ SOBRE A IMAGEM */}
+
             <div className="pointer-events-none absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-black/75 to-transparent" />
+
             {/* LANTERNA */}
-            {cameraAtiva && lanternaDisponivel && (
-              <button
-                type="button"
-                onClick={alternarLanterna}
-                aria-label={
-                  lanternaAtiva
-                    ? "Desligar lanterna"
-                    : "Ligar lanterna"
-                }
-                className="absolute right-3 top-3 flex h-10 w-10 items-center justify-center rounded-full border border-white/25 bg-black/50 text-white backdrop-blur-md"
-              >
-                {lanternaAtiva ? (
-                  <FlashlightOff size={19} />
-                ) : (
-                  <Flashlight size={19} />
-                )}
-              </button>
-            )}
+            {cameraAtiva &&
+              lanternaDisponivel && (
+                <button
+                  type="button"
+                  onClick={alternarLanterna}
+                  aria-label={
+                    lanternaAtiva
+                      ? "Desligar lanterna"
+                      : "Ligar lanterna"
+                  }
+                  className="absolute right-3 top-3 flex h-10 w-10 items-center justify-center rounded-full border border-white/25 bg-black/50 text-white backdrop-blur-md"
+                >
+                  {lanternaAtiva ? (
+                    <FlashlightOff size={19} />
+                  ) : (
+                    <Flashlight size={19} />
+                  )}
+                </button>
+              )}
+
             {/* STATUS DE LEITURA */}
             <div className="pointer-events-none absolute inset-x-0 bottom-6 flex flex-col items-center gap-2 text-center">
               <Loader2
                 size={24}
                 className="animate-spin text-[#F6CE6D]"
               />
+
               <p className="text-sm font-semibold text-white">
                 {carregando
                   ? "Validando QR Code..."
@@ -891,6 +1132,7 @@ export default function CredenciamentoClient() {
               </p>
             </div>
           </div>
+
           <button
             type="button"
             onClick={() => {
@@ -902,65 +1144,75 @@ export default function CredenciamentoClient() {
             Cancelar
           </button>
         </div>
-        {/* =====================================*
-*            SCANNER INICIAL*
-*        ===================================== */}
-        {tela === "scanner" && !cameraAberta && (
-          <div className="flex flex-1 flex-col items-center justify-center pb-8">
-            <div className="relative mb-7 flex aspect-square w-[min(62vw,230px)] items-center justify-center">
-              <MolduraScanner />
-              <Camera
-                size={68}
-                strokeWidth={1.2}
-                className="text-white/40"
-              />
+
+        {/* =====================================
+            SCANNER INICIAL
+        ===================================== */}
+
+        {tela === "scanner" &&
+          !cameraAberta && (
+            <div className="flex flex-1 flex-col items-center justify-center pb-8">
+              <div className="relative mb-7 flex aspect-square w-[min(62vw,230px)] items-center justify-center">
+                <MolduraScanner />
+
+                <Camera
+                  size={68}
+                  strokeWidth={1.2}
+                  className="text-white/40"
+                />
+              </div>
+
+              <h1 className="text-center text-[21px] font-bold leading-tight">
+                Aponte a câmera
+                <span className="block">
+                  para o QR Code
+                </span>
+              </h1>
+
+              <p className="mt-3 max-w-[260px] text-center text-xs leading-relaxed text-white/45">
+                Posicione o QR Code dentro da moldura
+                para iniciar o credenciamento.
+              </p>
+
+              <button
+                type="button"
+                onClick={iniciarCamera}
+                disabled={
+                  iniciandoCamera ||
+                  carregando ||
+                  !funcionario
+                }
+                className={`${BOTAO_DOURADO} mt-8 max-w-[350px]`}
+              >
+                {iniciandoCamera ? (
+                  <>
+                    <Loader2
+                      size={19}
+                      className="animate-spin"
+                    />
+                    Abrindo câmera...
+                  </>
+                ) : (
+                  <>
+                    <Camera size={19} />
+                    Abrir câmera
+                  </>
+                )}
+              </button>
             </div>
-            <h1 className="text-center text-[21px] font-bold leading-tight">
-              Aponte a câmera
-              <span className="block">
-                para o QR Code
-              </span>
-            </h1>
-            <p className="mt-3 max-w-[260px] text-center text-xs leading-relaxed text-white/45">
-              Posicione o QR Code dentro da moldura
-              para iniciar o credenciamento.
-            </p>
-            <button
-              type="button"
-              onClick={iniciarCamera}
-              disabled={
-                iniciandoCamera ||
-                carregando ||
-                !funcionario
-              }
-              className={`${BOTAO_DOURADO} mt-8 max-w-[350px]`}
-            >
-              {iniciandoCamera ? (
-                <>
-                  <Loader2
-                    size={19}
-                    className="animate-spin"
-                  />
-                  Abrindo câmera...
-                </>
-              ) : (
-                <>
-                  <Camera size={19} />
-                  Abrir câmera
-                </>
-              )}
-            </button>
-          </div>
-        )}
-        {/* =====================================*
-*            ERROS*
-*        ===================================== */}
+          )}
+
+        {/* =====================================
+            ERROS
+        ===================================== */}
+
         {erro && (
           <div
             role="alert"
             className="mb-4 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200"
           >
             {erro}
+
             {tela === "scanner" &&
               !cameraAberta && (
                 <button
@@ -973,179 +1225,278 @@ export default function CredenciamentoClient() {
               )}
           </div>
         )}
-        {/* =====================================*
-*            CARREGAMENTO*
-*        ===================================== */}
-        {carregando && tela !== "scanner" && (
-          <div className="mb-4 flex items-center justify-center gap-2 rounded-xl border border-[#E7BE69]/20 bg-[#E7BE69]/10 px-4 py-3 text-xs text-[#F6CE6D]">
-            <Loader2
-              size={17}
-              className="animate-spin"
-            />
-            Processando solicitação...
-          </div>
-        )}
-        {/* =====================================*
-*            INGRESSO DISPONÍVEL*
-*        ===================================== */}
-        {tela === "formulario" && ingresso && (
-          <div className="my-auto w-full py-2">
-            {/* CARTÃO VERDE */}
-            <div className="mb-6 overflow-hidden rounded-[20px] border border-emerald-400/20 bg-gradient-to-br from-[#064B32] via-[#063D2C] to-[#08291F] p-5 shadow-[0_14px_45px_rgba(0,0,0,0.25)]">
-              <div className="mb-4 flex items-center gap-2.5">
-                <div className="flex h-7 w-7 items-center justify-center rounded-full bg-[#22D979] text-[#073C28]">
-                  <Check
-                    size={17}
-                    strokeWidth={3}
-                  />
-                </div>
-                <span className="text-sm font-semibold text-emerald-50">
-                  Ingresso disponível
-                </span>
-              </div>
-              {/* IDENTIFICAÇÃO DO TIPO */}
-              {ingressoUsoUnico && (
-                <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-[#F4C75D]/30 bg-[#F4C75D]/10 px-3 py-1.5">
-                  <Ticket
-                    size={14}
-                    className="text-[#F4C75D]"
-                  />
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-[#F4C75D]">
-                    {ingressoImprensa
-                      ? "Ingresso imprensa"
-                      : "Ingresso individual"}
+
+        {/* =====================================
+            CARREGAMENTO
+        ===================================== */}
+
+        {carregando &&
+          tela !== "scanner" && (
+            <div className="mb-4 flex items-center justify-center gap-2 rounded-xl border border-[#E7BE69]/20 bg-[#E7BE69]/10 px-4 py-3 text-xs text-[#F6CE6D]">
+              <Loader2
+                size={17}
+                className="animate-spin"
+              />
+              Processando solicitação...
+            </div>
+          )}
+
+        {/* =====================================
+            INGRESSO DISPONÍVEL
+        ===================================== */}
+
+        {tela === "formulario" &&
+          ingresso && (
+            <div className="my-auto w-full py-2">
+              {/* CARTÃO VERDE */}
+              <div className="mb-6 overflow-hidden rounded-[20px] border border-emerald-400/20 bg-gradient-to-br from-[#064B32] via-[#063D2C] to-[#08291F] p-5 shadow-[0_14px_45px_rgba(0,0,0,0.25)]">
+                <div className="mb-4 flex items-center gap-2.5">
+                  <div className="flex h-7 w-7 items-center justify-center rounded-full bg-[#22D979] text-[#073C28]">
+                    <Check
+                      size={17}
+                      strokeWidth={3}
+                    />
+                  </div>
+
+                  <span className="text-sm font-semibold text-emerald-50">
+                    Ingresso disponível
                   </span>
                 </div>
-              )}
-              <h1 className="text-xl font-bold leading-snug">
-                {nomeDoIngresso(ingresso)}
-              </h1>
-              {ingressoUsoUnico && (
-                <div className="mt-3 rounded-xl border border-white/10 bg-black/15 px-3 py-3">
-                  <p className="text-sm font-semibold text-emerald-100">
-                    1 entrada por QR Code
-                  </p>
-                  <p className="mt-1 text-xs text-emerald-100/65">
-                    Sem direito a acompanhantes.
-                  </p>
+
+                {/* IDENTIFICAÇÃO DO TIPO */}
+                {ingressoUsoUnico && (
+                  <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-[#F4C75D]/30 bg-[#F4C75D]/10 px-3 py-1.5">
+                    <Ticket
+                      size={14}
+                      className="text-[#F4C75D]"
+                    />
+
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-[#F4C75D]">
+                      {ingressoCorte
+                        ? "Ingresso da Corte"
+                        : ingressoImprensa
+                          ? "Ingresso imprensa"
+                          : "Ingresso individual"}
+                    </span>
+                  </div>
+                )}
+
+                <h1 className="text-xl font-bold leading-snug">
+                  {nomeDoIngresso(ingresso)}
+                </h1>
+
+                {ingressoUsoUnico && (
+                  <div className="mt-3 rounded-xl border border-white/10 bg-black/15 px-3 py-3">
+                    <p className="text-sm font-semibold text-emerald-100">
+                      1 entrada por QR Code
+                    </p>
+
+                    <p className="mt-1 text-xs text-emerald-100/65">
+                      Sem direito a acompanhantes.
+                    </p>
+                  </div>
+                )}
+
+                <p className="mt-5 text-[11px] text-emerald-100/60">
+                  Código do ingresso
+                </p>
+
+                <p className="mt-1 text-base font-semibold tracking-wide text-emerald-50">
+                  {ingresso.codigo}
+                </p>
+              </div>
+
+              {mensagem && (
+                <div className="mb-4 rounded-xl border border-emerald-400/25 bg-emerald-500/10 p-3 text-xs text-emerald-200">
+                  {mensagem}
                 </div>
               )}
-              <p className="mt-5 text-[11px] text-emerald-100/60">
-                Código do ingresso
-              </p>
-              <p className="mt-1 text-base font-semibold tracking-wide text-emerald-50">
-                {ingresso.codigo}
-              </p>
-            </div>
-            {mensagem && (
-              <div className="mb-4 rounded-xl border border-emerald-400/25 bg-emerald-500/10 p-3 text-xs text-emerald-200">
-                {mensagem}
-              </div>
-            )}
-            {/* FORMULÁRIO ORIGINAL */}
-            <form
-              onSubmit={confirmarEntrada}
-              className="space-y-4"
-            >
-              <div>
-                <label
-                  htmlFor="nome"
-                  className="mb-2 block text-xs font-semibold text-white/85"
-                >
-                  Nome
-                </label>
-                <input
-                  id="nome"
-                  value={nome}
-                  onChange={(e) =>
-                    setNome(e.target.value)
-                  }
-                  required
-                  maxLength={100}
-                  autoComplete="given-name"
-                  placeholder="Nome do participante"
-                  className={CAMPO}
-                />
-              </div>
-              <div>
-                <label
-                  htmlFor="sobrenome"
-                  className="mb-2 block text-xs font-semibold text-white/85"
-                >
-                  Sobrenome
-                </label>
-                <input
-                  id="sobrenome"
-                  value={sobrenome}
-                  onChange={(e) =>
-                    setSobrenome(e.target.value)
-                  }
-                  required
-                  maxLength={100}
-                  autoComplete="family-name"
-                  placeholder="Sobrenome do participante"
-                  className={CAMPO}
-                />
-              </div>
-              <button
-                type="submit"
-                disabled={carregando}
-                className="flex min-h-[52px] w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-b from-[#29C96B] to-[#148B43] px-4 py-3 text-sm font-bold text-white shadow-[0_8px_25px_rgba(24,169,80,0.18)] transition hover:brightness-110 disabled:opacity-50"
+
+              {/* =====================================
+                  FORMULÁRIO DE CONFIRMAÇÃO
+                  CORTE: TITULAR AUTOMÁTICO
+                  DEMAIS: NOME E SOBRENOME
+              ===================================== */}
+
+              <form
+                onSubmit={confirmarEntrada}
+                className="space-y-4"
               >
-                {carregando ? (
-                  <Loader2
-                    size={20}
-                    className="animate-spin"
-                  />
+                {ingressoCorte ? (
+                  <div className="rounded-2xl border border-[#F4C75D]/25 bg-[#F4C75D]/10 p-5">
+                    <div className="mb-4 flex items-center gap-2">
+                      <ShieldCheck
+                        size={20}
+                        className="text-[#F4C75D]"
+                      />
+
+                      <p className="text-xs font-bold uppercase tracking-wider text-[#F4C75D]">
+                        Identificação da Corte
+                      </p>
+                    </div>
+
+                    <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-white/50">
+                      Titular do ingresso
+                    </p>
+
+                    <p className="break-words text-xl font-bold text-white">
+                      {titularCorte ||
+                        "Nome não identificado"}
+                    </p>
+
+                    <p className="mt-2 text-sm text-white/70">
+                      {ingresso.cargo ||
+                        "Integrante da Corte"}
+                    </p>
+
+                    <div className="mt-4 border-t border-white/10 pt-4">
+                      <p className="text-xs text-white/50">
+                        Tipo de acesso
+                      </p>
+
+                      <p className="mt-1 text-lg font-bold uppercase text-[#F4C75D]">
+                        {ingresso.tipoAcesso ||
+                          "CAMAROTE"}
+                      </p>
+                    </div>
+
+                    <div className="mt-4 rounded-xl border border-white/10 bg-black/20 px-3 py-3">
+                      <p className="text-xs leading-relaxed text-white/70">
+                        Confira a identidade do titular
+                        antes de confirmar a entrada.
+                      </p>
+
+                      <p className="mt-2 text-xs leading-relaxed text-white/50">
+                        O nome será registrado
+                        automaticamente, sem necessidade
+                        de preenchimento manual.
+                      </p>
+                    </div>
+                  </div>
                 ) : (
-                  <CheckCircle2 size={20} />
+                  <>
+                    <div>
+                      <label
+                        htmlFor="nome"
+                        className="mb-2 block text-xs font-semibold text-white/85"
+                      >
+                        Nome
+                      </label>
+
+                      <input
+                        id="nome"
+                        value={nome}
+                        onChange={(e) =>
+                          setNome(e.target.value)
+                        }
+                        required
+                        maxLength={100}
+                        autoComplete="given-name"
+                        placeholder="Nome do participante"
+                        className={CAMPO}
+                      />
+                    </div>
+
+                    <div>
+                      <label
+                        htmlFor="sobrenome"
+                        className="mb-2 block text-xs font-semibold text-white/85"
+                      >
+                        Sobrenome
+                      </label>
+
+                      <input
+                        id="sobrenome"
+                        value={sobrenome}
+                        onChange={(e) =>
+                          setSobrenome(e.target.value)
+                        }
+                        required
+                        maxLength={100}
+                        autoComplete="family-name"
+                        placeholder="Sobrenome do participante"
+                        className={CAMPO}
+                      />
+                    </div>
+                  </>
                 )}
-                Confirmar entrada
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  void novoCredenciamento();
-                }}
-                className={BOTAO_SECUNDARIO}
-              >
-                Cancelar
-              </button>
-            </form>
-          </div>
-        )}
-        {/* =====================================*
-*            ENTRADA CONFIRMADA*
-*        ===================================== */}
+
+                <button
+                  type="submit"
+                  disabled={
+                    carregando ||
+                    (ingressoCorte &&
+                      !titularCorte)
+                  }
+                  className="flex min-h-[52px] w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-b from-[#29C96B] to-[#148B43] px-4 py-3 text-sm font-bold text-white shadow-[0_8px_25px_rgba(24,169,80,0.18)] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {carregando ? (
+                    <Loader2
+                      size={20}
+                      className="animate-spin"
+                    />
+                  ) : (
+                    <CheckCircle2 size={20} />
+                  )}
+
+                  Confirmar entrada
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    void novoCredenciamento();
+                  }}
+                  className={BOTAO_SECUNDARIO}
+                >
+                  Cancelar
+                </button>
+              </form>
+            </div>
+          )}
+
+        {/* =====================================
+            ENTRADA CONFIRMADA
+        ===================================== */}
+
         {tela === "sucesso" && (
           <div className="my-auto w-full py-6 text-center">
             <div className="relative mx-auto mb-7 flex h-32 w-32 items-center justify-center">
               <div className="absolute inset-2 rounded-full bg-lime-400/20 blur-[35px]" />
+
               <div className="absolute inset-4 rounded-full border border-lime-400/30 bg-lime-400/[0.07] shadow-[0_0_35px_rgba(163,230,53,0.2)]" />
+
               <CheckCircle2
                 size={83}
                 strokeWidth={1.5}
                 className="relative text-[#A7F04A] drop-shadow-[0_0_18px_rgba(163,230,53,0.55)]"
               />
+
               <span className="absolute left-0 top-7 h-2 w-1 rotate-[-35deg] rounded-full bg-[#F5C95F]" />
               <span className="absolute right-1 top-4 h-2 w-1 rotate-[30deg] rounded-full bg-[#F5C95F]" />
               <span className="absolute bottom-5 left-3 h-1 w-2 rotate-[25deg] rounded-full bg-[#F5C95F]" />
               <span className="absolute bottom-7 right-0 h-2 w-1 rotate-[-20deg] rounded-full bg-[#F5C95F]" />
             </div>
+
             <h1 className="text-[28px] font-extrabold uppercase leading-tight tracking-tight text-[#A7F04A]">
               Entrada
               <span className="block">
                 confirmada!
               </span>
             </h1>
+
             <p className="mx-auto mt-3 max-w-[270px] text-sm leading-relaxed text-white/65">
               O ingresso foi registrado como utilizado.
             </p>
+
             {ingresso && (
               <div className="mt-7">
-                <CartaoIngresso ingresso={ingresso} />
+                <CartaoIngresso
+                  ingresso={ingresso}
+                />
               </div>
             )}
+
             <button
               type="button"
               onClick={() => {
@@ -1158,29 +1509,36 @@ export default function CredenciamentoClient() {
             </button>
           </div>
         )}
-        {/* =====================================*
-*            INGRESSO JÁ UTILIZADO*
-*        ===================================== */}
+
+        {/* =====================================
+            INGRESSO JÁ UTILIZADO
+        ===================================== */}
+
         {tela === "bloqueado" && (
           <div className="my-auto w-full py-6 text-center">
             <div className="relative mx-auto mb-7 flex h-32 w-32 items-center justify-center">
               <div className="absolute inset-2 rounded-full bg-red-500/20 blur-[38px]" />
+
               <div className="absolute inset-4 rounded-full border border-red-400/30 bg-red-500/[0.06]" />
+
               <XCircle
                 size={83}
                 strokeWidth={1.5}
                 className="relative text-[#FF5158] drop-shadow-[0_0_18px_rgba(255,81,88,0.5)]"
               />
             </div>
+
             <h1 className="text-[27px] font-extrabold uppercase leading-tight tracking-tight text-[#FF6668]">
               Ingresso já
               <span className="block">
                 utilizado
               </span>
             </h1>
+
             <p className="mx-auto mt-3 max-w-[280px] text-sm leading-relaxed text-white/65">
               Este QR Code já foi utilizado anteriormente.
             </p>
+
             {ingresso && (
               <div className="mt-7">
                 <CartaoIngresso
@@ -1189,20 +1547,23 @@ export default function CredenciamentoClient() {
                 />
               </div>
             )}
-            {/* IDENTIFICAÇÃO DO PARTICIPANTE */}
+
             {ingresso?.ultimaEntrada && (
               <CartaoUltimaEntrada
                 entrada={ingresso.ultimaEntrada}
               />
             )}
-            {ingresso && !ingresso.ultimaEntrada && (
-              <div className="mt-4 rounded-xl border border-red-400/15 bg-red-500/5 px-4 py-3 text-left">
-                <p className="text-xs text-white/60">
-                  Não foi encontrado um registro de entrada
-                  associado a este ingresso.
-                </p>
-              </div>
-            )}
+
+            {ingresso &&
+              !ingresso.ultimaEntrada && (
+                <div className="mt-4 rounded-xl border border-red-400/15 bg-red-500/5 px-4 py-3 text-left">
+                  <p className="text-xs text-white/60">
+                    Não foi encontrado um registro de
+                    entrada associado a este ingresso.
+                  </p>
+                </div>
+              )}
+
             {/* LIBERAÇÃO APENAS PARA ESCOLAS */}
             {ingresso?.tipo === "ESCOLA" && (
               <button
@@ -1217,6 +1578,7 @@ export default function CredenciamentoClient() {
                 Solicitar liberação
               </button>
             )}
+
             {/* INGRESSOS DE USO ÚNICO */}
             {ingressoUsoUnico && (
               <div className="mt-5 rounded-xl border border-[#F4C75D]/20 bg-[#F4C75D]/5 px-4 py-3 text-left">
@@ -1225,16 +1587,20 @@ export default function CredenciamentoClient() {
                     size={17}
                     className="mt-0.5 shrink-0 text-[#F4C75D]"
                   />
+
                   <p className="text-xs leading-relaxed text-white/70">
-                    {ingressoImprensa
-                      ? "Ingresso de imprensa de uso único."
-                      : "Ingresso individual de uso único."}{" "}
+                    {ingressoCorte
+                      ? "Ingresso da Corte de uso único."
+                      : ingressoImprensa
+                        ? "Ingresso de imprensa de uso único."
+                        : "Ingresso individual de uso único."}{" "}
                     Não é permitida uma nova entrada
                     com este QR Code.
                   </p>
                 </div>
               </div>
             )}
+
             <button
               type="button"
               onClick={() => {
@@ -1246,26 +1612,32 @@ export default function CredenciamentoClient() {
             </button>
           </div>
         )}
-        {/* =====================================*
-*            INGRESSO CANCELADO*
-*        ===================================== */}
+
+        {/* =====================================
+            INGRESSO CANCELADO
+        ===================================== */}
+
         {tela === "cancelado" && (
           <div className="my-auto w-full py-6 text-center">
             <div className="relative mx-auto mb-6 flex h-28 w-28 items-center justify-center">
               <div className="absolute inset-0 rounded-full bg-red-500/20 blur-[35px]" />
+
               <XCircle
                 size={80}
                 strokeWidth={1.5}
                 className="relative text-red-400"
               />
             </div>
+
             <h1 className="text-[26px] font-extrabold uppercase text-red-400">
               Ingresso cancelado
             </h1>
+
             <p className="mx-auto mt-3 max-w-[300px] text-sm leading-relaxed text-white/60">
               Este ingresso não pode ser utilizado nem
               liberado pelo PIN gerencial.
             </p>
+
             {ingresso && (
               <div className="mt-7">
                 <CartaoIngresso
@@ -1274,6 +1646,7 @@ export default function CredenciamentoClient() {
                 />
               </div>
             )}
+
             <button
               type="button"
               onClick={() => {
@@ -1286,10 +1659,12 @@ export default function CredenciamentoClient() {
             </button>
           </div>
         )}
-        {/* =====================================*
-*            LIBERAÇÃO GERENCIAL*
-*            SOMENTE ESCOLAS*
-*        ===================================== */}
+
+        {/* =====================================
+            LIBERAÇÃO GERENCIAL
+            SOMENTE ESCOLAS
+        ===================================== */}
+
         {tela === "liberacao" &&
           ingresso?.tipo === "ESCOLA" && (
             <div className="my-auto w-full py-4">
@@ -1300,16 +1675,22 @@ export default function CredenciamentoClient() {
                     className="text-[#F2C86B]"
                   />
                 </div>
+
                 <h1 className="text-2xl font-bold">
                   Autorização do gerente
                 </h1>
+
                 <p className="mt-2 text-xs text-white/50">
                   Liberação excepcional de ingresso.
                 </p>
               </div>
+
               <div className="mb-5">
-                <CartaoIngresso ingresso={ingresso} />
+                <CartaoIngresso
+                  ingresso={ingresso}
+                />
               </div>
+
               {tentativasRestantes !== null &&
                 !bloqueadoAte && (
                   <div className="mb-4 rounded-xl border border-amber-400/25 bg-amber-400/10 p-3 text-xs text-amber-200">
@@ -1317,19 +1698,27 @@ export default function CredenciamentoClient() {
                     {tentativasRestantes}
                   </div>
                 )}
+
               {bloqueadoAte && (
                 <div className="mb-4 rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-200">
                   PIN bloqueado até{" "}
-                  {new Intl.DateTimeFormat("pt-BR", {
-                    timeZone: "America/Sao_Paulo",
-                    day: "2-digit",
-                    month: "2-digit",
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  }).format(new Date(bloqueadoAte))}{" "}
+                  {new Intl.DateTimeFormat(
+                    "pt-BR",
+                    {
+                      timeZone:
+                        "America/Sao_Paulo",
+                      day: "2-digit",
+                      month: "2-digit",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    }
+                  ).format(
+                    new Date(bloqueadoAte)
+                  )}{" "}
                   (horário de Brasília).
                 </div>
               )}
+
               <form
                 onSubmit={liberarIngresso}
                 className="space-y-4"
@@ -1341,6 +1730,7 @@ export default function CredenciamentoClient() {
                   >
                     Motivo da liberação
                   </label>
+
                   <textarea
                     id="motivo"
                     value={motivo}
@@ -1355,6 +1745,7 @@ export default function CredenciamentoClient() {
                     className={`${CAMPO} h-auto min-h-[100px] resize-none py-3`}
                   />
                 </div>
+
                 <div>
                   <label
                     htmlFor="pinGerente"
@@ -1362,11 +1753,13 @@ export default function CredenciamentoClient() {
                   >
                     PIN especial do gerente
                   </label>
+
                   <div className="relative">
                     <LockKeyhole
                       size={18}
                       className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-white/40"
                     />
+
                     <input
                       id="pinGerente"
                       type={
@@ -1390,10 +1783,13 @@ export default function CredenciamentoClient() {
                       placeholder="8 dígitos"
                       className={`${CAMPO} pl-11 pr-12`}
                     />
+
                     <button
                       type="button"
                       onClick={() =>
-                        setMostrarPin(!mostrarPin)
+                        setMostrarPin(
+                          !mostrarPin
+                        )
                       }
                       aria-label={
                         mostrarPin
@@ -1410,6 +1806,7 @@ export default function CredenciamentoClient() {
                     </button>
                   </div>
                 </div>
+
                 <button
                   type="submit"
                   disabled={
@@ -1432,14 +1829,16 @@ export default function CredenciamentoClient() {
                   ) : (
                     <UnlockKeyhole size={19} />
                   )}
+
                   Autorizar liberação
                 </button>
+
                 <button
                   type="button"
                   onClick={() => {
-                    setPinGerente("");
-                    setMotivo("");
                     setErro("");
+                    setPinGerente("");
+                    setMostrarPin(false);
                     setTela("bloqueado");
                   }}
                   className={BOTAO_SECUNDARIO}
